@@ -1,0 +1,40 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFrameworks>net6.0;net8.0;net9.0</TargetFrameworks>
+        <AssemblyName>MQTTnet.Extensions.ManagedClient</AssemblyName>
+        <RootNamespace>MQTTnet.Extensions.ManagedClient</RootNamespace>
+        <Company>The contributors of MQTTnet</Company>
+        <Product>MQTTnet</Product>
+        <Description>This is an extension library which provides a managed MQTT client with additional features using MQTTnet.</Description>
+        <Authors>The contributors of MQTTnet</Authors>
+        <PackageId>MQTTnet.Extensions.ManagedClient</PackageId>
+        <SignAssembly>false</SignAssembly>
+        <DelaySign>false</DelaySign>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+        <Copyright>Copyright (c) .NET Foundation and Contributors</Copyright>
+        <PackageProjectUrl>https://github.com/dotnet/MQTTnet</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/dotnet/MQTTnet.git</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageTags>MQTT Message Queue Telemetry Transport MQTTClient MQTTServer Server MQTTBroker Broker NETStandard IoT InternetOfThings Messaging Hardware Arduino Sensor Actuator M2M ESP Smart Home Cities Automation Xamarin Blazor</PackageTags>
+        <NeutralLanguage>en-US</NeutralLanguage>
+        <EnableNETAnalyzers>false</EnableNETAnalyzers>
+        <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageReleaseNotes>For release notes please go to MQTTnet release notes (https://www.nuget.org/packages/MQTTnet/).</PackageReleaseNotes>
+        <DisableImplicitAspNetCoreAnalyzers>true</DisableImplicitAspNetCoreAnalyzers>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>1591;NETSDK1138</NoWarn>
+        <Platforms>AnyCPU</Platforms>
+    </PropertyGroup>
+    
+    <ItemGroup>
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All" />
+        <PackageReference Include="MQTTnet" Version="4.3.7.1207" />
+    </ItemGroup>
+
+</Project>
