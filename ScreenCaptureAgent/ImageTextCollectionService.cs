@@ -145,6 +145,7 @@ namespace ScreenCaptureAgent
 
                     // 汇总结果并发送 MQTT 消息
                     var mqttMessage = JsonConvert.SerializeObject(results);
+                    Log.Information("识别结果：{Results}", mqttMessage);
                     UploadIsTelemetryData(mqttMessage);
 
                     // 保存本地日志
@@ -171,20 +172,25 @@ namespace ScreenCaptureAgent
         {
             using (Mat screenShot = Cv2.ImRead(screenShotPath, ImreadModes.Color))
             {
-                var vertices = _config.ImageVerificationArea.Vertices;
-                var roi = new Rect(vertices[0].X, vertices[0].Y, vertices[1].X - vertices[0].X, vertices[1].Y - vertices[0].Y);
-
-                var path = Path.Combine("data", _config.ImageVerificationArea.FileName);
-                using (Mat verificationImage = Cv2.ImRead(path, ImreadModes.Color))
+                // 逐个对比图像检测区域
+                foreach (var area in _config.ImageVerificationAreas)
                 {
-                    Mat roiImage = screenShot[roi];
-                    Mat result = new Mat();
-                    Cv2.MatchTemplate(roiImage, verificationImage, result, TemplateMatchModes.CCoeffNormed);
-                    Cv2.MinMaxLoc(result, out var minVal, out var maxVal, out var minLoc, out var maxLoc);
+                    var vertices = area.Vertices;
+                    var roi = new Rect(vertices[0].X, vertices[0].Y, vertices[1].X - vertices[0].X, vertices[1].Y - vertices[0].Y);
 
-                    return maxVal >= _config.ImageVerificationArea.MatchDegree;
+                    var path = Path.Combine("data", area.FileName);
+                    using (Mat verificationImage = Cv2.ImRead(path, ImreadModes.Color))
+                    {
+                        Mat roiImage = screenShot[roi];
+                        Mat matResult = new Mat();
+                        Cv2.MatchTemplate(roiImage, verificationImage, matResult, TemplateMatchModes.CCoeffNormed);
+                        Cv2.MinMaxLoc(matResult, out var minVal, out var maxVal, out var minLoc, out var maxLoc);
+
+                        if (maxVal < area.MatchDegree) return false;  // 只要有区域图像对比不通过，就认为未监测到程序画面
+                    }
                 }
             }
+            return true;
         }
 
         private string PerformOcr(string screenShotPath, List<Point> vertices)
@@ -213,8 +219,13 @@ namespace ScreenCaptureAgent
 
         private void SaveToCsv(Dictionary<string, string> results)
         {
+            string saveDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "output");
+            if (!Directory.Exists(saveDir))
+            {
+                Directory.CreateDirectory(saveDir);
+            }
             string date = DateTime.Now.ToString("yyyyMMdd");
-            string csvPath = Path.Combine("output", $"{date}.csv");
+            string csvPath = Path.Combine(saveDir, $"{date}.csv");
             bool isNewFile = !File.Exists(csvPath);
 
             using (var writer = new StreamWriter(csvPath, true, Encoding.UTF8))

@@ -22,7 +22,7 @@ namespace ScreenCaptureAgent
 
 
         public MqttBrokerConfig MqttBroker { get; set; }
-        public ImageVerificationArea ImageVerificationArea { get; set; }
+        public List<ImageVerificationArea> ImageVerificationAreas { get; set; }
         public List<ImageCollectionArea> ImageCollectionAreas { get; set; }
     }
 
