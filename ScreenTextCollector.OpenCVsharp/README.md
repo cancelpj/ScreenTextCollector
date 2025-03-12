@@ -1,4 +1,5 @@
-# 基于屏幕截图 OCR 的数据采集程序
+# ScreenCaptureAgent
+一个基于屏幕截图 OCR 的数据采集程序（**stc.exe**）
 
 ## 简介
 
@@ -8,7 +9,7 @@
 
 - 定时截取指定屏幕的图像（通过 ScreenNumber 指定显示器编号）。
 - 支持根据多个检测区域（ImageVerificationAreas）来验证截图的有效性。
-- 对图像中的多个采集区域（ImageCollectionAreas）进行文本识别。
+- 对图像中的多个采集区域（ImageCollectionAreas）进行文本识别，使用 OpenCvSharp4.OCRTesseract 。
 - 将识别结果通过 MQTT 推送到指定的 broker。
 - 可选择将识别结果保存为本地 CSV 文件。
 
@@ -16,7 +17,7 @@
 
 ### 安装依赖
 
-请查看各项目的 .NET Framework 版本要求。
+确保已安装 .NET Framework 4.8 。
 
 ### 配置文件
 
@@ -36,4 +37,4 @@
 - 用画图程序的矩形选择功能框选出采集区域，记录框选时的左上角顶点坐标和宽高
 
 ## 使用方法
-双击运行 `stc.exe` 即可开始采集，关闭窗口即可停止采集。运行期间要保持目标屏幕画面不被遮挡。
+双击运行`stc.exe`即可开始采集，关闭窗口即可停止采集。运行期间要保持目标屏幕画面不被遮挡。
