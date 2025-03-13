@@ -1,4 +1,4 @@
-﻿namespace ScreenTextCollector.OpenCVsharp
+﻿namespace ScreenTextCollector
 {
     internal static class Program
     {

@@ -1,14 +1,15 @@
 ﻿using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 // 有关程序集的一般信息由以下
 // 控制。更改这些特性值可修改
 // 与程序集关联的信息。
-[assembly: AssemblyTitle("ScreenTextCollector.OpenCVsharp")]
+[assembly: AssemblyTitle("PluginInterface")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("ScreenTextCollector.OpenCVsharp")]
+[assembly: AssemblyProduct("PluginInterface")]
 [assembly: AssemblyCopyright("Copyright ©  2025")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
@@ -19,7 +20,7 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(false)]
 
 // 如果此项目向 COM 公开，则下列 GUID 用于类型库的 ID
-[assembly: Guid("54a64e5b-fbef-4d8f-a99d-f616701d0028")]
+[assembly: Guid("69f0497e-08c8-4bea-8c94-8085c03a417e")]
 
 // 程序集的版本信息由下列四个值组成: 
 //
