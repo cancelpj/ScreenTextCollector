@@ -14,15 +14,37 @@ namespace ScreenTextCollector
 {
     public static class Tool
     {
+        public static readonly Settings Settings =
+            JsonConvert.DeserializeObject<Settings>(File.ReadAllText("appsettings.json"));
+
         public static readonly NLog.Logger Log = NLog.LogManager.GetCurrentClassLogger();
+
+        /// <summary>
+        /// 保存设置
+        /// </summary>
+        /// <returns></returns>
+        public static MethodResult SaveSettings()
+        {
+            try
+            {
+                var json = JsonConvert.SerializeObject(Settings, Formatting.Indented);
+                File.WriteAllText("appsettings.json", json);
+            }
+            catch (Exception ex)
+            {
+                var result = new MethodResult("保存设置失败", ex);
+                OutputMessage(result);
+            }
+
+            return new MethodResult();
+        }
 
         /// <summary>
         /// 截屏
         /// </summary>
-        /// <param name="settings">程序配置信息</param>
         /// <param name="screenShotQueue">截屏处理消息队列</param>
         /// <returns></returns>
-        public static MethodResult CaptureScreenShot(Settings settings, BlockingCollection<string> screenShotQueue)
+        public static MethodResult CaptureScreenShot(BlockingCollection<string> screenShotQueue)
         {
             try
             {
@@ -34,12 +56,12 @@ namespace ScreenTextCollector
 
                 var path = Path.Combine(tempDir, $"{DateTime.Now:yyyyMMddHHmmssfff}.png");
 
-                if (Screen.AllScreens.Length - 1 < settings.ScreenNumber)
+                if (Screen.AllScreens.Length - 1 < Settings.ScreenNumber)
                 {
                     return new MethodResult("屏幕编号超出范围");
                 }
 
-                Screen screen = Screen.AllScreens[settings.ScreenNumber];
+                Screen screen = Screen.AllScreens[Settings.ScreenNumber];
                 Rectangle bounds = screen.Bounds;
                 using (var screenShot = new Bitmap(bounds.Width, bounds.Height))
                 {
@@ -67,14 +89,14 @@ namespace ScreenTextCollector
         /// <summary>
         /// 循环处理截屏消息队列
         /// </summary>
-        /// <param name="settings">程序配置信息</param>
         /// <param name="screenShotQueue">截屏处理消息队列</param>
-        /// <param name="cancellationToken"></param>
         /// <param name="verifyImage"></param>
         /// <param name="performOcr"></param>
-        public static void ProcessScreenshots(Settings settings, BlockingCollection<string> screenShotQueue,
-            CancellationToken cancellationToken, Func<string, List<ImageVerificationArea>, bool> verifyImage,
-            Func<string, ImageCollectionArea, string> performOcr)
+        /// <param name="cancellationToken"></param>
+        public static void ProcessScreenshots(BlockingCollection<string> screenShotQueue,
+            Func<string, List<ImageVerificationArea>, bool> verifyImage,
+            Func<string, ImageCollectionArea, string> performOcr,
+            CancellationToken cancellationToken)
         {
             while (cancellationToken.IsCancellationRequested == false)
             {
@@ -84,7 +106,7 @@ namespace ScreenTextCollector
                     string screenShotPath = screenShotQueue.Take();
 
                     // 图像校验
-                    if (!verifyImage(screenShotPath, settings.ImageVerificationAreas))
+                    if (!verifyImage(screenShotPath, Settings.ImageVerificationAreas))
                     {
                         OutputMessage(new MethodResult("未监测到程序画面"));
                         File.Delete(screenShotPath);
@@ -93,7 +115,7 @@ namespace ScreenTextCollector
 
                     // 图像采集
                     var results = new Dictionary<string, string>();
-                    Parallel.ForEach(settings.ImageCollectionAreas, area =>
+                    Parallel.ForEach(Settings.ImageCollectionAreas, area =>
                     {
                         var text = performOcr(screenShotPath, area);
                         results[area.Name] = text;
@@ -105,7 +127,7 @@ namespace ScreenTextCollector
                     OutputMessage(new MethodResult(mqttMessage, MethodResultType.Success));
 
                     // 保存本地日志
-                    if (settings.CsvRecord)
+                    if (Settings.CsvRecord)
                     {
                         SaveToCsv(results);
                     }

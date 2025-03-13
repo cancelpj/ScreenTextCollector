@@ -61,13 +61,12 @@ namespace ScreenTextCollector
         {
             Tool.Log.Info("图像处理线程已启动");
             IOcrService ocrService = new OcrService();
-            Tool.ProcessScreenshots(_settings, _screenShotQueue, _cts.Token, ocrService.VerifyImage,
-                ocrService.PerformOcr);
+            Tool.ProcessScreenshots(_screenShotQueue, ocrService.VerifyImage, ocrService.PerformOcr, _cts.Token);
         }
 
         private void CaptureScreenShot(object sender, ElapsedEventArgs e)
         {
-            var result = Tool.CaptureScreenShot(_settings, _screenShotQueue);
+            var result = Tool.CaptureScreenShot(_screenShotQueue);
             Tool.OutputMessage(result);
         }
     }
