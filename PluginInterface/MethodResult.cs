@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace ScreenTextCollector
+namespace PluginInterface
 {
     public class MethodResult
     {

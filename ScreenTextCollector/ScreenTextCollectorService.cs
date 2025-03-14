@@ -1,5 +1,4 @@
-﻿using Newtonsoft.Json;
-using PluginInterface;
+﻿using PluginInterface;
 using ScreenTextCollector.OpenCvSharp;
 using System;
 using System.Collections.Concurrent;
@@ -16,8 +15,7 @@ namespace ScreenTextCollector
         private CancellationTokenSource _cts = new CancellationTokenSource();
         private readonly BlockingCollection<string> _screenShotQueue = new BlockingCollection<string>();
 
-        private readonly Settings _settings =
-            JsonConvert.DeserializeObject<Settings>(File.ReadAllText("appsettings.json"));
+        private readonly Settings _settings = Tool.Settings;
 
         public void Start(string[] args)
         {
