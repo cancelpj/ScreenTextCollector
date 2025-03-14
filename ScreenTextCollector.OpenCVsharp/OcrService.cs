@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using PluginInterface;
 
-namespace ScreenTextCollector.OpenCVsharp
+namespace ScreenTextCollector.OpenCvSharp
 {
     public class OcrService : IOcrService
     {
@@ -40,7 +40,6 @@ namespace ScreenTextCollector.OpenCVsharp
             {
                 var roi = new Rect(area.TopLeftX, area.TopLeftY, area.Width, area.Height);
 
-                // 使用 OpenCvSharp 进行简单的 OCR 示例，实际应用中可以替换为 PaddleOCRSharp
                 var trainedDataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data/");
                 using (var ocr = OCRTesseract.Create(
                            datapath: trainedDataPath,
@@ -51,7 +50,9 @@ namespace ScreenTextCollector.OpenCVsharp
                 {
                     Mat roiImage = screenShot[roi];
                     Mat gray = new Mat();
+                    // 将彩色图像转换为灰度图像
                     Cv2.CvtColor(roiImage, gray, ColorConversionCodes.BGR2GRAY);
+                    // OCR 识别
                     ocr.Run(gray, out string text, out _, out _, out _);
                     return text.Trim();
                 }

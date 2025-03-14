@@ -1,6 +1,6 @@
 ﻿using Newtonsoft.Json;
 using PluginInterface;
-using ScreenTextCollector.OpenCVsharp;
+using ScreenTextCollector.OpenCvSharp;
 using System;
 using System.Collections.Concurrent;
 using System.IO;

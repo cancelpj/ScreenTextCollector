@@ -69,9 +69,9 @@
       <Project>{69f0497e-08c8-4bea-8c94-8085c03a417e}</Project>
       <Name>PluginInterface</Name>
     </ProjectReference>
-    <ProjectReference Include="..\ScreenTextCollector.OpenCVsharp\ScreenTextCollector.OpenCVsharp.csproj">
+    <ProjectReference Include="..\ScreenTextCollector.OpenCVsharp\ScreenTextCollector.OpenCvSharp.csproj">
       <Project>{c61ae89f-5951-fc90-49c3-be65bc122445}</Project>
-      <Name>ScreenTextCollector.OpenCVsharp</Name>
+      <Name>ScreenTextCollector.OpenCvSharp</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

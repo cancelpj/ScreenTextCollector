@@ -28,6 +28,11 @@ namespace ScreenTextCollector
             try
             {
                 var json = JsonConvert.SerializeObject(Settings, Formatting.Indented);
+                //复制文件备份
+                var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json");
+                var bakFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"appsettings-{DateTime.Now:yyyyMMddHHmmssfff}.json");
+                if (File.Exists(filePath))
+                    File.Copy(filePath, bakFilePath, true);
                 File.WriteAllText("appsettings.json", json);
             }
             catch (Exception ex)
@@ -43,8 +48,9 @@ namespace ScreenTextCollector
         /// 截屏
         /// </summary>
         /// <param name="screenShotQueue">截屏处理消息队列</param>
+        /// <param name="screenNumber">指定屏幕编号，否则使用配置文件中的值</param>
         /// <returns></returns>
-        public static MethodResult CaptureScreenShot(BlockingCollection<string> screenShotQueue)
+        public static MethodResult CaptureScreenShot(BlockingCollection<string> screenShotQueue, int? screenNumber = null)
         {
             try
             {
@@ -62,6 +68,7 @@ namespace ScreenTextCollector
                 }
 
                 Screen screen = Screen.AllScreens[Settings.ScreenNumber];
+                if (screenNumber != null) screen = Screen.AllScreens[screenNumber.Value];
                 Rectangle bounds = screen.Bounds;
                 using (var screenShot = new Bitmap(bounds.Width, bounds.Height))
                 {

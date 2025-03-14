@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.12.35728.132
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScreenTextCollector.OpenCVsharp", "ScreenTextCollector.OpenCVsharp\ScreenTextCollector.OpenCVsharp.csproj", "{C61AE89F-5951-FC90-49C3-BE65BC122445}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScreenTextCollector.OpenCvSharp", "ScreenTextCollector.OpenCVsharp\ScreenTextCollector.OpenCvSharp.csproj", "{C61AE89F-5951-FC90-49C3-BE65BC122445}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScreenTextCollector.PaddleOCR", "ScreenTextCollector.PaddleOCR\ScreenTextCollector.PaddleOCR.csproj", "{221B3711-8825-456F-B81A-A2CDE326C4FF}"
 EndProject
@@ -11,7 +11,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScreenTextCollector", "Scre
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PluginInterface", "PluginInterface\PluginInterface.csproj", "{69F0497E-08C8-4BEA-8C94-8085C03A417E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CaptureScreen", "CaptureScreen\CaptureScreen.csproj", "{DA746922-9ECE-4787-9260-715AE272EB49}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Setup", "Setup\Setup.csproj", "{DA746922-9ECE-4787-9260-715AE272EB49}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
