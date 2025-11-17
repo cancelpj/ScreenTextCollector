@@ -14,10 +14,10 @@ namespace Setup
         static void Main(string[] args)
         {
             Console.WriteLine("\n欢迎使用屏幕文字采集工具配置程序！");
-            Console.WriteLine("\n本程序将对目标屏幕截屏，用于配置屏幕检测区域和采集区域。请确保在运行本程序时目标区域上没有其他窗口遮挡。\n");
-            int screenNumber = GetCoordinate("目标屏幕编号");
+            Console.WriteLine("\n本程序将对目标屏幕截屏，用于配置屏幕检测区域和采集区域。\n");
+            int screenNumber = GetCoordinate("目标屏幕编号(从0开始)");
             Tool.Settings.ScreenNumber = screenNumber;
-            Console.WriteLine("\n按回车键开始截屏...");
+            Console.WriteLine("\n请确保在运行本程序时目标区域上没有其他窗口遮挡，按回车键开始截屏...");
             Console.ReadLine();
             var screenShotQueue = new BlockingCollection<string>();
             var result = Tool.CaptureScreenShot(screenShotQueue, screenNumber);
@@ -35,7 +35,7 @@ namespace Setup
 
             Console.WriteLine("截屏画面已用画图工具打开，接下来请跟随我完成采集配置。");
             Console.Write("\n首先，是否要清空已配置的检测区域？(y/n)：");
-            if (Console.ReadKey().Key == ConsoleKey.Y) Tool.Settings.ImageVerificationAreas.Clear();
+            if (Console.ReadLine()?.ToUpper() == "Y") Tool.Settings.ImageVerificationAreas.Clear();
             Console.WriteLine("\n请在画图工具中确定检测区域，然后依次输入检测区域的左上角坐标和宽度、高度，输入后按回车键确认。");
             while (true)
             {
@@ -65,7 +65,7 @@ namespace Setup
                 SaveSettings();
 
                 Console.Write("\n是否继续输入下一个检测区域？(y/n)：");
-                if (Console.ReadKey().Key != ConsoleKey.Y) break;
+                if (Console.ReadLine()?.ToUpper() != "Y") break;
             }
 
             #endregion
@@ -74,7 +74,7 @@ namespace Setup
 
             Console.WriteLine("\n检测区域配置已完成，接下来我们进行采集区域配置。");
             Console.Write("\n首先，是否要清空已配置的采集区域？(y/n)：");
-            if (Console.ReadKey().Key == ConsoleKey.Y) Tool.Settings.ImageCollectionAreas.Clear();
+            if (Console.ReadLine()?.ToUpper() == "Y") Tool.Settings.ImageCollectionAreas.Clear();
             Console.WriteLine("\n接下来请在画图工具中确定采集区域，然后依次输入采集区域的左上角坐标和宽度、高度，输入后按回车键确认。");
             while (true)
             {
@@ -95,18 +95,22 @@ namespace Setup
                 SaveSettings();
 
                 Console.Write("\n是否继续输入下一个采集区域？(y/n)：");
-                if (Console.ReadKey().Key != ConsoleKey.Y) break;
+                if (Console.ReadLine()?.ToUpper() != "Y") break;
             }
 
             #endregion
 
             Console.Write("\n配置已全部保存，请用记事本打开 appsettings.json 文件，手动编辑其它配置项。");
+            Process.Start("notepad.exe", Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json"));
+
             //Console.Write("配置已全部保存，是否立即启动采集？(y/n)：");
-            //if (Console.ReadKey().Key != ConsoleKey.Y) return;
+            //if (Console.ReadLine()?.ToUpper() != "Y") return;
             //if (File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "stc.exe")))
             //    Process.Start("stc.exe");
             //else
             //    Console.WriteLine("未找到 stc.exe，请手动执行。");
+
+            Console.ReadKey();
         }
 
         private static void SaveSettings()
