@@ -29,7 +29,8 @@ namespace PluginInterface
                 var json = JsonConvert.SerializeObject(Settings, Formatting.Indented);
                 //复制文件备份
                 var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json");
-                var bakFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, $"appsettings-{DateTime.Now:yyyyMMddHHmmssfff}.json");
+                var bakFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                    $"appsettings-{DateTime.Now:yyyyMMddHHmmssfff}.json");
                 if (File.Exists(filePath))
                     File.Copy(filePath, bakFilePath, true);
                 File.WriteAllText("appsettings.json", json);
@@ -46,10 +47,8 @@ namespace PluginInterface
         /// <summary>
         /// 截屏
         /// </summary>
-        /// <param name="screenShotQueue">截屏处理消息队列</param>
-        /// <param name="screenNumber">指定屏幕编号，否则使用配置文件中的值</param>
-        /// <returns></returns>
-        public static MethodResult CaptureScreenShot(BlockingCollection<string> screenShotQueue, int? screenNumber = null)
+        /// <returns>截图保存路径</returns>
+        public static MethodResult GetScreenCapture()
         {
             try
             {
@@ -67,7 +66,6 @@ namespace PluginInterface
                 }
 
                 Screen screen = Screen.AllScreens[Settings.ScreenNumber];
-                if (screenNumber != null) screen = Screen.AllScreens[screenNumber.Value];
                 Rectangle bounds = screen.Bounds;
                 using (var screenShot = new Bitmap(bounds.Width, bounds.Height))
                 {
@@ -81,74 +79,51 @@ namespace PluginInterface
                     }
                 }
 
-                // 发送消息到队列
-                screenShotQueue.Add(path);
+                return new MethodResult(path, MethodResultType.Success);
             }
             catch (Exception ex)
             {
                 return new MethodResult("截屏失败", ex);
             }
-
-            return new MethodResult();
         }
 
-        /// <summary>
-        /// 循环处理截屏消息队列
-        /// </summary>
-        /// <param name="screenShotQueue">截屏处理消息队列</param>
-        /// <param name="verifyImage"></param>
-        /// <param name="performOcr"></param>
-        /// <param name="cancellationToken"></param>
-        public static void ProcessScreenshots(BlockingCollection<string> screenShotQueue,
-            Func<string, List<ImageVerificationArea>, bool> verifyImage,
-            Func<string, ImageCollectionArea, string> performOcr,
-            CancellationToken cancellationToken)
+        public static MethodResult ProcessScreenCapture(string screenShotPath, Func<string, List<ImageVerificationArea>, bool> verifyImage,
+            Func<string, ImageCollectionArea, string> performOcr)
         {
-            while (cancellationToken.IsCancellationRequested == false)
+            try
             {
-                try
+                // 图像校验
+                if (!verifyImage(screenShotPath, Settings.ImageVerificationAreas))
                 {
-                    // 阻塞等待队列中的新项
-                    string screenShotPath = screenShotQueue.Take();
-
-                    // 图像校验
-                    if (!verifyImage(screenShotPath, Settings.ImageVerificationAreas))
-                    {
-                        OutputMessage(new MethodResult("未监测到程序画面"));
-                        File.Delete(screenShotPath);
-                        continue;
-                    }
-
-                    // 图像采集
-                    var results = new Dictionary<string, string>();
-                    Parallel.ForEach(Settings.ImageCollectionAreas, area =>
-                    {
-                        var text = performOcr(screenShotPath, area);
-                        results[area.Name] = text;
-                    });
-
-                    // 汇总结果并发送 MQTT 消息
-                    var mqttMessage = JsonConvert.SerializeObject(results);
-                    //Log.Information("识别结果：{Results}", mqttMessage);
-                    OutputMessage(new MethodResult(mqttMessage, MethodResultType.Success));
-
-                    // 保存本地日志
-                    if (Settings.CsvRecord)
-                    {
-                        SaveToCsv(results);
-                    }
-
-                    // 删除截屏图片
                     File.Delete(screenShotPath);
+                    return new MethodResult("未监测到程序画面", MethodResultType.Warning);
                 }
-                catch (InvalidOperationException)
+
+                // 图像采集
+                var data = new Dictionary<string, string>();
+                Parallel.ForEach(Settings.ImageCollectionAreas, area =>
                 {
-                    // 队列已完成添加且为空时抛出此异常，忽略即可
-                }
-                catch (Exception ex)
+                    var text = performOcr(screenShotPath, area);
+                    data[area.Name] = text;
+                });
+
+                // 保存本地日志
+                if (Settings.CsvRecord)
                 {
-                    OutputMessage(new MethodResult("处理截屏失败", ex));
+                    SaveToCsv(data);
                 }
+
+                // 汇总结果
+                File.Delete(screenShotPath);
+                var result = JsonConvert.SerializeObject(data);
+                Log.Info("识别结果：{0}", result);
+                return new MethodResult(result, MethodResultType.Success);
+            }
+            catch (Exception ex)
+            {
+                //File.Delete(screenShotPath);
+                Log.Error(ex, "处理截屏失败");
+                return new MethodResult("处理截屏失败", ex);
             }
         }
 
@@ -183,10 +158,10 @@ namespace PluginInterface
         /// <summary>
         /// 输出消息
         /// </summary>
-        /// <param name="result">方法结果</param>
-        /// <param name="uploadAction">上传消息的委托</param>
+        /// <param name="result">方法结果消息</param>
+        /// <param name="func">处理消息的委托</param>
         /// <exception cref="ArgumentOutOfRangeException">结果类型不在预期范围内</exception>
-        public static void OutputMessage(MethodResult result, Action<string> uploadAction = null)
+        public static void OutputMessage(MethodResult result, Func<string, MethodResult> func = null)
         {
             switch (result.ResultType)
             {
@@ -197,13 +172,16 @@ namespace PluginInterface
                     Log.Warn(result.Message);
                     break;
                 case MethodResultType.Error:
-                    Log.Error(result.Exception, result.Message);
+                    if (result.Exception != null)
+                        Log.Error(result.Exception, result.Message);
+                    else
+                        Log.Error(result.Message);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();
             }
 
-            uploadAction?.Invoke(result.Message);
+            func?.Invoke(result.Message);
         }
     }
 }

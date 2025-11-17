@@ -1,5 +1,6 @@
 ﻿using PluginInterface;
 using ScreenTextCollector.OpenCvSharp;
+using SimpleMqttClient;
 using System;
 using System.Collections.Concurrent;
 using System.IO;
@@ -20,7 +21,15 @@ namespace ScreenTextCollector
         public void Start(string[] args)
         {
             // 启动 MQTT 客户端
-            //StartMqttClient();
+            var mqttBrokerConfig = Tool.Settings.MqttBroker;
+            if (!mqttBrokerConfig.EnableMqttPush) return;
+
+            var ret = StartMqttClient(mqttBrokerConfig, out var mqttClient);
+            if (ret.ResultType != MethodResultType.Success)
+            {
+                Tool.OutputMessage(ret);
+                return;
+            }
 
             #region 启动时清空temp文件夹
 
@@ -38,7 +47,7 @@ namespace ScreenTextCollector
             StartProcessingThread();
         }
 
-        public void Stop()
+        ~ScreenTextCollectorService()
         {
             _cts.Cancel();
             _captureTimer.Stop();
@@ -49,7 +58,7 @@ namespace ScreenTextCollector
 
         private void StartScreenShotThread()
         {
-            _captureTimer = new Timer(_settings.CaptureFrequency);
+            _captureTimer = new Timer(Tool.Settings.MqttBroker.CaptureFrequency);
             _captureTimer.Elapsed += CaptureScreenShot;
             _captureTimer.Start();
             Tool.Log.Info("截屏线程已启动");
@@ -59,13 +68,50 @@ namespace ScreenTextCollector
         {
             Tool.Log.Info("图像处理线程已启动");
             IOcrService ocrService = new OcrService();
-            Tool.ProcessScreenshots(_screenShotQueue, ocrService.VerifyImage, ocrService.PerformOcr, _cts.Token);
+            Tool.ProcessScreenshots(_screenShotQueue, ocrService.VerifyImage, ocrService.PerformOcr, PushMqtt, _cts.Token);
         }
 
         private void CaptureScreenShot(object sender, ElapsedEventArgs e)
         {
             var result = Tool.CaptureScreenShot(_screenShotQueue);
             Tool.OutputMessage(result);
+        }
+
+        private MethodResult StartMqttClient(MqttBrokerConfig mqttBrokerConfig, out MqttClient mqttClient)
+        {
+            mqttClient = null;
+            if (string.IsNullOrEmpty(mqttBrokerConfig.Ip)) return new MethodResult("请配置 MQTT 服务器 IP 地址");
+            if (string.IsNullOrEmpty(mqttBrokerConfig.ClientId)) return new MethodResult("请配置 MQTT 推送客户端 ID");
+            if (string.IsNullOrEmpty(mqttBrokerConfig.Topic)) return new MethodResult("请配置 MQTT 推送主题");
+
+            Tool.Log.Info($"MQTT 推送服务已启动，服务器: {mqttBrokerConfig.Ip}, 客户端ID: {mqttBrokerConfig.ClientId}");
+            try
+            {
+                mqttClient = new MqttClient(mqttBrokerConfig.ClientId);
+                if (!string.IsNullOrEmpty(mqttBrokerConfig.Username) && !string.IsNullOrEmpty(mqttBrokerConfig.Password))
+                    mqttClient.SetCredentials(mqttBrokerConfig.Username, mqttBrokerConfig.Password);
+                mqttClient.Connected += () =>
+                {
+                    Console.WriteLine($"{DateTime.Now} MQTT 服务器已连接！\n");
+                    //mqttClient.Subscribe("command/topic");
+                };
+
+                mqttClient.Disconnected += () =>
+                {
+                    Console.WriteLine($"{DateTime.Now} MQTT 服务器已断开！\n");
+                };
+            
+                return new MethodResult("ok", MethodResultType.Success);
+            }
+            catch (Exception ex)
+            {
+                return new MethodResult("MQTT 服务连接异常", ex);
+            }
+        }
+
+        private MethodResult PushMqtt(string message)
+        {
+
         }
     }
 }

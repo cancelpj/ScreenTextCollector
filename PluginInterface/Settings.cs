@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Diagnostics.Eventing.Reader;
 
 namespace PluginInterface
 {
@@ -10,32 +11,55 @@ namespace PluginInterface
         public string DeviceName { get; set; }
 
         /// <summary>
-        /// 采集频率，单位：毫秒
-        /// </summary>
-        public int CaptureFrequency { get; set; }
-
-        /// <summary>
         /// 本地 csv 文件记录
         /// </summary>
         public bool CsvRecord { get; set; }
 
         /// <summary>
-        /// 屏幕编号，从 0 开始
+        /// 是否启用HTTP服务
         /// </summary>
-        public int ScreenNumber { get; set; }
+        public HttpConfig Http { get; set; }
 
         public MqttBrokerConfig MqttBroker { get; set; }
+
+        /// <summary>
+        /// 屏幕编号，从 0 开始
+        /// </summary>
+        public int ScreenNumber { get; set; } = 0;
+
         public List<ImageVerificationArea> ImageVerificationAreas { get; set; }
         public List<ImageCollectionArea> ImageCollectionAreas { get; set; }
     }
 
+    public class HttpConfig
+    {
+        /// <summary>
+        /// 是否启用HTTP服务
+        /// </summary>
+        public bool EnableHttp { get; set; } = true;
+
+        public string Ip { get; set; } = "+";
+        public int Port { get; set; } = 80;
+    }
+
     public class MqttBrokerConfig
     {
+        /// <summary>
+        /// 是否启用MQTT推送
+        /// </summary>
+        public bool EnableMqttPush { get; set; } = false;
+
+        /// <summary>
+        /// 采集频率，单位：毫秒
+        /// </summary>
+        public int CaptureFrequency { get; set; }
+
         public string Ip { get; set; }
+        public int Port { get; set; } = 1883;
         public string ClientId { get; set; }
         public string Username { get; set; }
         public string Password { get; set; }
-        public int CacheDays { get; set; }
+        public string Topic { get; set; }
     }
 
     /// <summary>
