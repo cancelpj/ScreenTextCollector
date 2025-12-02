@@ -1,11 +1,9 @@
-﻿using System;
-using System.Collections.Concurrent;
+﻿using PluginInterface;
+using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
-using PluginInterface;
-using ScreenTextCollector;
 
 namespace Setup
 {
@@ -19,21 +17,21 @@ namespace Setup
             Tool.Settings.ScreenNumber = screenNumber;
             Console.WriteLine("\n请确保在运行本程序时目标区域上没有其他窗口遮挡，按回车键开始截屏...");
             Console.ReadLine();
-            var screenShotQueue = new BlockingCollection<string>();
-            var result = Tool.CaptureScreenShot(screenShotQueue, screenNumber);
-            if (result.Exception != null)
+            var result = Tool.GetScreenCapture();
+            if (result.ResultType != MethodResultType.Success)
             {
-                Console.WriteLine($"截屏失败：{result.Exception.Message}");
-                throw result.Exception;
+                Tool.OutputMessage(result);
+                return;
             }
 
-            var screenShotPath = screenShotQueue.Take();
+            var screenShotPath = result.Message;
             //用 windows 画图工具打开 screenShotPath
             Process.Start("mspaint.exe", screenShotPath);
 
             #region 引导配置检测区域
 
             Console.WriteLine("截屏画面已用画图工具打开，接下来请跟随我完成采集配置。");
+            Tool.BackupSettingFile();
             Console.Write("\n首先，是否要清空已配置的检测区域？(y/n)：");
             if (Console.ReadLine()?.ToUpper() == "Y") Tool.Settings.ImageVerificationAreas.Clear();
             Console.WriteLine("\n请在画图工具中确定检测区域，然后依次输入检测区域的左上角坐标和宽度、高度，输入后按回车键确认。");

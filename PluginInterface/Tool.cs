@@ -25,12 +25,6 @@ namespace PluginInterface
             try
             {
                 var json = JsonConvert.SerializeObject(Settings, Formatting.Indented);
-                //复制文件备份
-                var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json");
-                var bakFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
-                    $"appsettings-{DateTime.Now:yyyyMMddHHmmssfff}.json");
-                if (File.Exists(filePath))
-                    File.Copy(filePath, bakFilePath, true);
                 File.WriteAllText("appsettings.json", json);
             }
             catch (Exception ex)
@@ -40,6 +34,18 @@ namespace PluginInterface
             }
 
             return new MethodResult();
+        }
+
+        /// <summary>
+        /// 复制配置文件备份
+        /// </summary>
+        public static void BackupSettingFile()
+        {
+            var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json");
+            var bakFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                $"appsettings-{DateTime.Now:yyyyMMddHHmmssfff}.json");
+            if (File.Exists(filePath))
+                File.Copy(filePath, bakFilePath, true);
         }
 
         /// <summary>
