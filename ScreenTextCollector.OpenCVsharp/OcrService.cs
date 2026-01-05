@@ -20,9 +20,9 @@ namespace ScreenTextCollector.OpenCvSharp
 
                     var path = Path.Combine("data", area.FileName);
                     using (Mat verificationImage = Cv2.ImRead(path))
+                    using (Mat roiImage = screenShot[roi])
+                    using (Mat matResult = new Mat())
                     {
-                        Mat roiImage = screenShot[roi];
-                        Mat matResult = new Mat();
                         Cv2.MatchTemplate(roiImage, verificationImage, matResult, TemplateMatchModes.CCoeffNormed);
                         Cv2.MinMaxLoc(matResult, out var minVal, out var maxVal, out var minLoc, out var maxLoc);
 
@@ -47,9 +47,9 @@ namespace ScreenTextCollector.OpenCvSharp
                            //charWhitelist: "0123456789", // 只允许识别数字
                            oem: 3,
                            psmode: 3))
+                using (Mat roiImage = screenShot[roi])
+                using (Mat gray = new Mat())
                 {
-                    Mat roiImage = screenShot[roi];
-                    Mat gray = new Mat();
                     // 将彩色图像转换为灰度图像
                     Cv2.CvtColor(roiImage, gray, ColorConversionCodes.BGR2GRAY);
                     // OCR 识别

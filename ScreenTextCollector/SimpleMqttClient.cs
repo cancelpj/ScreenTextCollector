@@ -652,9 +652,18 @@ namespace SimpleMqttClient
         public void Dispose()
         {
             Disconnect();
-            try { _connAckEvent?.Close(); } catch { }
+            try { _connAckEvent?.Dispose(); } catch { }
             StopPingTimer();
             StopReconnectTimer();
+            
+            // 显式释放网络资源
+            try { _stream?.Dispose(); } catch { }
+            try { _client?.Dispose(); } catch { }
+            
+            // 清空事件订阅者，避免事件处理函数被保存
+            MessageReceived = null;
+            Connected = null;
+            Disconnected = null;
         }
     }
 }

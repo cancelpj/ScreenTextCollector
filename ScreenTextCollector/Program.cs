@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading;
@@ -16,9 +17,20 @@ namespace ScreenTextCollector
     {
         private static bool _isRunning = true;
         private static readonly IOcrService OcrService = new OcrService();
+        private static MqttClient _mqttClient = null;  // 保持全局引用便于清理
+        private static HttpListener _listener = null;  // 保持全局引用便于清理
 
         static void Main(string[] args)
         {
+            // 参数处理：支持任意顺序的参数
+            bool isDebugMode = args.Contains("-debug", StringComparer.OrdinalIgnoreCase);
+
+            if (isDebugMode)
+            {
+                Console.WriteLine("按任意键继续...");
+                Console.ReadKey();
+            }
+
             #region 启动时清空temp文件夹
 
             Tool.Log.Info("启动时清空 temp 文件夹");
@@ -43,16 +55,17 @@ namespace ScreenTextCollector
                             try
                             {
                                 #region MQTT 连接配置
-                                var mqttClient = new MqttClient(mqttBrokerConfig.ClientId);
+                                _mqttClient = new MqttClient(mqttBrokerConfig.ClientId);
                                 if (!string.IsNullOrEmpty(mqttBrokerConfig.Username) && !string.IsNullOrEmpty(mqttBrokerConfig.Password))
-                                    mqttClient.SetCredentials(mqttBrokerConfig.Username, mqttBrokerConfig.Password);
-                                mqttClient.Connected += () =>
+                                    _mqttClient.SetCredentials(mqttBrokerConfig.Username, mqttBrokerConfig.Password);
+                                
+                                _mqttClient.Connected += () =>
                                 {
                                     Tool.Log.Info($"{DateTime.Now} MQTT 服务器已连接！\n");
                                     //mqttClient.Subscribe("command/topic");
                                 };
 
-                                mqttClient.Disconnected += () =>
+                                _mqttClient.Disconnected += () =>
                                 {
                                     Tool.Log.Info($"{DateTime.Now} MQTT 服务器已断开！\n");
                                 };
@@ -85,8 +98,8 @@ namespace ScreenTextCollector
                                         payloadJson = ret.Message;
                                     }
 
-                                    MqttConnect(mqttClient, mqttBrokerConfig.Ip, mqttBrokerConfig.Port);
-                                    mqttClient.Publish(mqttBrokerConfig.Topic, payloadJson);
+                                    MqttConnect(_mqttClient, mqttBrokerConfig.Ip, mqttBrokerConfig.Port);
+                                    _mqttClient.Publish(mqttBrokerConfig.Topic, payloadJson);
                                     Tool.Log.Info($"{DateTime.Now} 发布 MQTT 消息: {payloadJson}\n");
 
                                     Thread.Sleep(mqttBrokerConfig.CaptureFrequency * 1000);
@@ -95,6 +108,13 @@ namespace ScreenTextCollector
                             catch (Exception ex)
                             {
                                 Tool.Log.Info($"{DateTime.Now} MQTT 推送服务异常: {ex}\n");
+                            }
+                            finally
+                            {
+                                // 确保清理 MQTT 客户端
+                                _mqttClient?.Disconnect();
+                                _mqttClient?.Dispose();
+                                _mqttClient = null;
                             }
 
                         })
@@ -110,18 +130,18 @@ namespace ScreenTextCollector
             #endregion
 
             var httpConfig = Tool.Settings.Http;
-            HttpListener listener = new HttpListener();
             if (httpConfig.EnableHttp)
             {
                 #region 启动 HTTP 服务
 
                 //启动一个 HTTP 服务监听 HTTP GET 请求
+                _listener = new HttpListener();
                 var uri = $"http://{httpConfig.Ip}:{httpConfig.Port}/";
-                listener.Prefixes.Add(uri);
-                listener.Start();
+                _listener.Prefixes.Add(uri);
+                _listener.Start();
 
                 // 创建一个异步回调来处理请求
-                listener.BeginGetContext(new AsyncCallback(ListenerCallback), listener);
+                _listener.BeginGetContext(new AsyncCallback(ListenerCallback), _listener);
 
                 Tool.Log.Info($"{DateTime.Now} HTTP服务已启动，服务器: {uri}\n");
 
@@ -135,8 +155,37 @@ namespace ScreenTextCollector
             {
                 e.Cancel = true;
                 _isRunning = false;
-                listener.Stop();
-                listener.Close();
+                
+                // 立即停止监听
+                if (_listener != null)
+                {
+                    try
+                    {
+                        _listener.Stop();
+                        _listener.Close();
+                    }
+                    catch { }
+                    finally
+                    {
+                        _listener = null;
+                    }
+                }
+                
+                // 断开 MQTT 连接
+                if (_mqttClient != null)
+                {
+                    try
+                    {
+                        _mqttClient.Disconnect();
+                    }
+                    catch { }
+                    finally
+                    {
+                        _mqttClient?.Dispose();
+                        _mqttClient = null;
+                    }
+                }
+                
                 Tool.Log.Info("\n服务已停止");
             };
 
@@ -150,10 +199,13 @@ namespace ScreenTextCollector
         static void MqttConnect(MqttClient mqttClient, string mqttServerIp, int mqttServerPort)
         {
             mqttClient.Connect(mqttServerIp, mqttServerPort);
-            while (!mqttClient.IsConnected)
+            while (!mqttClient.IsConnected && _isRunning)
             {
                 Thread.Sleep(10000);
-                mqttClient.Connect(mqttServerIp, mqttServerPort);
+                if (_isRunning)  // 检查是否还在运行
+                {
+                    mqttClient.Connect(mqttServerIp, mqttServerPort);
+                }
             }
         }
 
@@ -161,57 +213,85 @@ namespace ScreenTextCollector
         {
             if (!_isRunning) return;
 
-            HttpListener listener = (HttpListener)result.AsyncState;
-            HttpListenerContext context = listener.EndGetContext(result);
-            HttpListenerRequest request = context.Request;
-            HttpListenerResponse response = context.Response;
-            response.StatusCode = 200;
-
             try
             {
-                // 只处理 GET 请求
-                if (request.HttpMethod == "GET")
+                HttpListener listener = (HttpListener)result.AsyncState;
+                HttpListenerContext context = listener.EndGetContext(result);
+                HttpListenerRequest request = context.Request;
+                HttpListenerResponse response = context.Response;
+                
+                response.StatusCode = 200;
+
+                try
                 {
-                    // 根据请求的URL路径返回不同的响应
-                    string responseString;
-                    if (request.Url.AbsolutePath == "/health")
+                    // 只处理 GET 请求
+                    if (request.HttpMethod == "GET")
                     {
-                        responseString = "ScreenTextCollector is alive.";
-                    }
-                    else if (request.Url.AbsolutePath.StartsWith("/process/"))
-                    {
-                        var processName = request.Url.AbsolutePath.Replace("/process/", "");
-                        //按 processName 检查进程状态
-                        responseString = CheckProcess(processName);
-                    }
-                    else if (request.Url.AbsolutePath == "/stc")
-                    {
-                        var ret = ScreenTextCollect();
-                        responseString = ret.Message;
-                        response.StatusCode = ret.ResultType == MethodResultType.Success ? 200 : 500;
-                    }
-                    else
-                    {
-                        responseString = "404 Not Found";
-                        response.StatusCode = 404;
-                    }
+                        // 根据请求的URL路径返回不同的响应
+                        string responseString;
+                        if (request.Url.AbsolutePath == "/health")
+                        {
+                            responseString = "ScreenTextCollector is alive.";
+                        }
+                        else if (request.Url.AbsolutePath.StartsWith("/process/"))
+                        {
+                            var processName = request.Url.AbsolutePath.Replace("/process/", "");
+                            //按 processName 检查进程状态
+                            responseString = CheckProcess(processName);
+                        }
+                        else if (request.Url.AbsolutePath == "/stc")
+                        {
+                            var ret = ScreenTextCollect();
+                            responseString = ret.Message;
+                            response.StatusCode = ret.ResultType == MethodResultType.Success ? 200 : 500;
+                        }
+                        else
+                        {
+                            responseString = "404 Not Found";
+                            response.StatusCode = 404;
+                        }
 
-                    byte[] buffer = Encoding.UTF8.GetBytes(responseString);
-                    response.ContentLength64 = buffer.Length;
-                    response.OutputStream.Write(buffer, 0, buffer.Length);
+                        byte[] buffer = Encoding.UTF8.GetBytes(responseString);
+                        response.ContentLength64 = buffer.Length;
+                        response.OutputStream.Write(buffer, 0, buffer.Length);
+                    }
                 }
-
-                response.Close();
-
+                catch (Exception e)
+                {
+                    Tool.Log.Error($"{DateTime.Now} {e}\n");
+                    response.StatusCode = 500;
+                }
+                finally
+                {
+                    // 手动关闭响应流
+                    try
+                    {
+                        response.OutputStream.Close();
+                        response.Close();
+                    }
+                    catch { }
+                }
+            }
+            catch (ObjectDisposedException)
+            {
+                // 监听器已被关闭，正常退出
+                return;
             }
             catch (Exception e)
             {
-                Tool.Log.Error($"{DateTime.Now} {e}\n");
+                Tool.Log.Error($"{DateTime.Now} ListenerCallback 异常: {e}\n");
             }
             finally
             {
-                // 继续监听下一个请求
-                listener.BeginGetContext(ListenerCallback, listener);
+                // 继续监听下一个请求（如果仍在运行）
+                if (_isRunning && _listener != null)
+                {
+                    try
+                    {
+                        _listener.BeginGetContext(ListenerCallback, _listener);
+                    }
+                    catch { }
+                }
             }
         }
 
@@ -241,7 +321,18 @@ namespace ScreenTextCollector
         public static string CheckProcess(string processName)
         {
             var processes = Process.GetProcessesByName(processName);
-            return processes.Length > 0 ? "Running" : "Standby";
+            try
+            {
+                return processes.Length > 0 ? "Running" : "Standby";
+            }
+            finally
+            {
+                // 释放进程句柄
+                foreach (var p in processes)
+                {
+                    p?.Dispose();
+                }
+            }
         }
     }
 }
