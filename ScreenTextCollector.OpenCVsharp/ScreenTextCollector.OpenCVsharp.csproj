@@ -34,7 +34,4 @@
   <ItemGroup>
     <ProjectReference Include="..\PluginInterface\PluginInterface.csproj" />
   </ItemGroup>
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="xcopy $(ProjectDir)data\*.png $(ProjectDir)$(OutDir)data\ /Y" />
-  </Target>
 </Project>

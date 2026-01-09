@@ -1,4 +1,6 @@
 ﻿using Newtonsoft.Json;
+using NLog;
+using NLog.Config;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -14,7 +16,41 @@ namespace PluginInterface
         public static readonly Settings Settings =
             JsonConvert.DeserializeObject<Settings>(File.ReadAllText("appsettings.json"));
 
-        public static readonly NLog.Logger Log = NLog.LogManager.GetCurrentClassLogger();
+        public static readonly Logger Log = LogManager.GetCurrentClassLogger();
+
+        #region 让Nlog写日志的同时可以广播到UI
+
+        // 事件：外部（如 UI）可以订阅以接收日志消息
+        public static event Action<LogLevel, string> LogReceived;
+
+        // 静态构造：注册自定义 NLog 目标（GUI 目标），使所有日志都可以被广播
+        static Tool()
+        {
+            try
+            {
+                var config = LogManager.Configuration ?? new LoggingConfiguration();
+                // 如果已存在同名目标，先移除（避免重复添加）
+                if (config.FindTargetByName("Gui") == null)
+                {
+                    var guiTarget = new NLogGuiTarget { Name = "Gui", Layout = "${message}" };
+                    config.AddTarget("Gui", guiTarget);
+                    var rule = new LoggingRule("*", LogLevel.Debug, guiTarget);
+                    config.LoggingRules.Add(rule);
+                    LogManager.Configuration = config;
+                }
+            }
+            catch
+            {
+                // 静态初始化不应抛异常（保持容错）
+            }
+        }
+
+        internal static void RaiseLog(LogLevel level, string message)
+        {
+            LogReceived?.Invoke(level, message);
+        }
+
+        #endregion
 
         /// <summary>
         /// 保存设置

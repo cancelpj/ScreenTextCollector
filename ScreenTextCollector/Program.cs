@@ -1,24 +1,26 @@
-﻿using Newtonsoft.Json;
-using PluginInterface;
+﻿using PluginInterface;
 using ScreenTextCollector.OpenCvSharp;
 using SimpleMqttClient;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Text;
+using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading;
+using System.Windows.Forms;
 
 namespace ScreenTextCollector
 {
-    internal static class Program
+    internal static partial class Program
     {
         private static bool _isRunning = true;
         private static readonly IOcrService OcrService = new OcrService();
-        private static MqttClient _mqttClient = null;  // 保持全局引用便于清理
-        private static HttpListener _listener = null;  // 保持全局引用便于清理
+        private static Thread _mqttPushThread = null;
+        private static MqttClient _mqttClient = null; // 保持全局引用便于清理
+        private static HttpListener _listener = null; // 保持全局引用便于清理
+        private static Mutex _mutex = null;
 
         static void Main(string[] args)
         {
@@ -27,312 +29,202 @@ namespace ScreenTextCollector
 
             if (isDebugMode)
             {
-                Console.WriteLine("按任意键继续...");
-                Console.ReadKey();
+                MessageBox.Show(@"按任意键继续...");
             }
 
-            #region 启动时清空temp文件夹
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
 
-            Tool.Log.Info("启动时清空 temp 文件夹");
-            string tempDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "temp");
-            if (Directory.Exists(tempDir))
+            // 单一实例运行检查（使用Mutex）
+            string mutexName = "Global\\ScreenTextCollector_" +
+                               Assembly.GetExecutingAssembly().GetName().Name.GetHashCode();
+            _mutex = new Mutex(true, mutexName, out bool createdNew);
+
+            if (!createdNew)
             {
-                Directory.Delete(tempDir, true); // 删除文件夹及其内容
+                // 已有实例运行，激活现有实例
+                ActivateExistingInstance();
+                _mutex?.Dispose();
+                return;
             }
-
-            #endregion
-            #region MQTT推送功能
-
-            var mqttBrokerConfig = Tool.Settings.MqttBroker;
-            if (mqttBrokerConfig.EnableMqttPush)
-            {
-                if (!string.IsNullOrEmpty(mqttBrokerConfig.Ip) && !string.IsNullOrEmpty(mqttBrokerConfig.Topic))
-                {
-                    #region 用一个独立线程定时检查进程并推送 MQTT
-                    new Thread(() =>
-                        {
-                            Tool.Log.Info($"{DateTime.Now} MQTT 推送服务已启动，服务器: {mqttBrokerConfig.Ip}, 主题: {mqttBrokerConfig.Topic}\n");
-                            try
-                            {
-                                #region MQTT 连接配置
-                                _mqttClient = new MqttClient(mqttBrokerConfig.ClientId);
-                                if (!string.IsNullOrEmpty(mqttBrokerConfig.Username) && !string.IsNullOrEmpty(mqttBrokerConfig.Password))
-                                    _mqttClient.SetCredentials(mqttBrokerConfig.Username, mqttBrokerConfig.Password);
-                                
-                                _mqttClient.Connected += () =>
-                                {
-                                    Tool.Log.Info($"{DateTime.Now} MQTT 服务器已连接！\n");
-                                    //mqttClient.Subscribe("command/topic");
-                                };
-
-                                _mqttClient.Disconnected += () =>
-                                {
-                                    Tool.Log.Info($"{DateTime.Now} MQTT 服务器已断开！\n");
-                                };
-                                #endregion MQTT 连接配置
-
-                                while (_isRunning)
-                                {
-                                    string payloadJson;
-                                    var ret = ScreenTextCollect();
-                                    if (ret.ResultType == MethodResultType.Success)
-                                    {
-                                        var data = JsonConvert.DeserializeObject<Dictionary<string, string>>(ret.Message);
-                                        var telemetry = new Dictionary<string, object>
-                                        {
-                                            { "CLIENT", mqttBrokerConfig.ClientId },
-                                            { "DEVICECODE", Tool.Settings.DeviceName },
-                                            { "EQUIPMENT", Tool.Settings.DeviceName },
-                                            { "GROUPCODE", "collection" },
-                                            { "TIMESTAMP", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }
-                                        };
-                                        foreach (var item in data)
-                                        {
-                                            telemetry.Add(item.Key, item.Value);
-                                        }
-
-                                        payloadJson = JsonConvert.SerializeObject(telemetry);
-                                    }
-                                    else
-                                    {
-                                        payloadJson = ret.Message;
-                                    }
-
-                                    MqttConnect(_mqttClient, mqttBrokerConfig.Ip, mqttBrokerConfig.Port);
-                                    _mqttClient.Publish(mqttBrokerConfig.Topic, payloadJson);
-                                    Tool.Log.Info($"{DateTime.Now} 发布 MQTT 消息: {payloadJson}\n");
-
-                                    Thread.Sleep(mqttBrokerConfig.CaptureFrequency * 1000);
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                Tool.Log.Info($"{DateTime.Now} MQTT 推送服务异常: {ex}\n");
-                            }
-                            finally
-                            {
-                                // 确保清理 MQTT 客户端
-                                _mqttClient?.Disconnect();
-                                _mqttClient?.Dispose();
-                                _mqttClient = null;
-                            }
-
-                        })
-                    { IsBackground = true }.Start();
-                    #endregion
-                }
-                else
-                {
-                    Tool.Log.Info("配置文件中缺少必要的 MQTT 配置项。");
-                }
-            }
-
-            #endregion
-
-            var httpConfig = Tool.Settings.Http;
-            if (httpConfig.EnableHttp)
-            {
-                #region 启动 HTTP 服务
-
-                //启动一个 HTTP 服务监听 HTTP GET 请求
-                _listener = new HttpListener();
-                var uri = $"http://{httpConfig.Ip}:{httpConfig.Port}/";
-                _listener.Prefixes.Add(uri);
-                _listener.Start();
-
-                // 创建一个异步回调来处理请求
-                _listener.BeginGetContext(new AsyncCallback(ListenerCallback), _listener);
-
-                Tool.Log.Info($"{DateTime.Now} HTTP服务已启动，服务器: {uri}\n");
-
-                #endregion 启动 HTTP 服务
-            }
-
-            Tool.Log.Info("按 Ctrl+C 键停止服务...");
-
-            // 设置控制台事件处理
-            Console.CancelKeyPress += (sender, e) =>
-            {
-                e.Cancel = true;
-                _isRunning = false;
-                
-                // 立即停止监听
-                if (_listener != null)
-                {
-                    try
-                    {
-                        _listener.Stop();
-                        _listener.Close();
-                    }
-                    catch { }
-                    finally
-                    {
-                        _listener = null;
-                    }
-                }
-                
-                // 断开 MQTT 连接
-                if (_mqttClient != null)
-                {
-                    try
-                    {
-                        _mqttClient.Disconnect();
-                    }
-                    catch { }
-                    finally
-                    {
-                        _mqttClient?.Dispose();
-                        _mqttClient = null;
-                    }
-                }
-                
-                Tool.Log.Info("\n服务已停止");
-            };
-
-            // 保持服务运行
-            while (_isRunning)
-            {
-                Thread.Sleep(100);
-            }
-        }
-
-        static void MqttConnect(MqttClient mqttClient, string mqttServerIp, int mqttServerPort)
-        {
-            mqttClient.Connect(mqttServerIp, mqttServerPort);
-            while (!mqttClient.IsConnected && _isRunning)
-            {
-                Thread.Sleep(10000);
-                if (_isRunning)  // 检查是否还在运行
-                {
-                    mqttClient.Connect(mqttServerIp, mqttServerPort);
-                }
-            }
-        }
-
-        static void ListenerCallback(IAsyncResult result)
-        {
-            if (!_isRunning) return;
 
             try
             {
-                HttpListener listener = (HttpListener)result.AsyncState;
-                HttpListenerContext context = listener.EndGetContext(result);
-                HttpListenerRequest request = context.Request;
-                HttpListenerResponse response = context.Response;
-                
-                response.StatusCode = 200;
+                #region 启动时清空temp文件夹
 
+                Tool.Log.Info("启动时清空 temp 文件夹");
+                string tempDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "temp");
+                if (Directory.Exists(tempDir))
+                {
+                    Directory.Delete(tempDir, true); // 删除文件夹及其内容
+                }
+
+                #endregion
+
+                #region 启动服务
+
+                var httpConfig = Tool.Settings.Http;
+                if (httpConfig.EnableHttp)
+                {
+                    StartHttpServer(httpConfig);
+                }
+
+                var mqttBrokerConfig = Tool.Settings.MqttBroker;
+                if (mqttBrokerConfig.EnableMqttPush)
+                {
+                    //用一个独立线程定时检查进程并推送 MQTT
+                    _mqttPushThread = new Thread(() => StartMqttPush(mqttBrokerConfig)) { IsBackground = true };
+                    _mqttPushThread.Start();
+                }
+
+                #endregion
+
+                Application.Run(new Form1());
+            }
+            finally
+            {
+                _mutex?.ReleaseMutex();
+                _mutex?.Dispose();
+                _mutex = null;
+            }
+        }
+
+        public static void Exit()
+        {
+            _isRunning = false;
+
+            // 立即停止监听
+            if (_listener != null)
+            {
                 try
                 {
-                    // 只处理 GET 请求
-                    if (request.HttpMethod == "GET")
-                    {
-                        // 根据请求的URL路径返回不同的响应
-                        string responseString;
-                        if (request.Url.AbsolutePath == "/health")
-                        {
-                            responseString = "ScreenTextCollector is alive.";
-                        }
-                        else if (request.Url.AbsolutePath.StartsWith("/process/"))
-                        {
-                            var processName = request.Url.AbsolutePath.Replace("/process/", "");
-                            //按 processName 检查进程状态
-                            responseString = CheckProcess(processName);
-                        }
-                        else if (request.Url.AbsolutePath == "/stc")
-                        {
-                            var ret = ScreenTextCollect();
-                            responseString = ret.Message;
-                            response.StatusCode = ret.ResultType == MethodResultType.Success ? 200 : 500;
-                        }
-                        else
-                        {
-                            responseString = "404 Not Found";
-                            response.StatusCode = 404;
-                        }
-
-                        byte[] buffer = Encoding.UTF8.GetBytes(responseString);
-                        response.ContentLength64 = buffer.Length;
-                        response.OutputStream.Write(buffer, 0, buffer.Length);
-                    }
+                    _listener.Stop();
+                    _listener.Close();
                 }
-                catch (Exception e)
+                catch
                 {
-                    Tool.Log.Error($"{DateTime.Now} {e}\n");
-                    response.StatusCode = 500;
                 }
                 finally
                 {
-                    // 手动关闭响应流
-                    try
-                    {
-                        response.OutputStream.Close();
-                        response.Close();
-                    }
-                    catch { }
+                    _listener = null;
                 }
             }
-            catch (ObjectDisposedException)
+
+            // 断开 MQTT 连接
+            if (_mqttClient != null)
             {
-                // 监听器已被关闭，正常退出
-                return;
-            }
-            catch (Exception e)
-            {
-                Tool.Log.Error($"{DateTime.Now} ListenerCallback 异常: {e}\n");
-            }
-            finally
-            {
-                // 继续监听下一个请求（如果仍在运行）
-                if (_isRunning && _listener != null)
+                try
                 {
-                    try
-                    {
-                        _listener.BeginGetContext(ListenerCallback, _listener);
-                    }
-                    catch { }
+                    _mqttClient?.Disconnect();
+                    _mqttPushThread.Abort();
+                }
+                catch
+                {
+                }
+                finally
+                {
+                    _mqttClient?.Dispose();
+                    _mqttClient = null;
                 }
             }
+
+            Tool.Log.Info("\n服务已停止");
+            Application.Exit();
         }
 
-        private static MethodResult ScreenTextCollect()
+        private static void ActivateExistingInstance()
         {
-            var ret = Tool.GetScreenCapture();
-            if (ret.ResultType != MethodResultType.Success)
-            {
-                Tool.OutputMessage(ret);
-                return ret;
-            }
-
-            ret = Tool.ProcessScreenCapture(ret.Message, OcrService.VerifyImage, OcrService.PerformOcr);
-            if (ret.ResultType != MethodResultType.Success)
-            {
-                Tool.OutputMessage(ret);
-            }
-
-            return ret;
-        }
-
-        /// <summary>
-        /// 按 processName 检查进程状态
-        /// </summary>
-        /// <param name="processName"></param>
-        /// <returns></returns>
-        public static string CheckProcess(string processName)
-        {
-            var processes = Process.GetProcessesByName(processName);
+            var current = Process.GetCurrentProcess();
+            var processes = Process.GetProcessesByName(current.ProcessName);
             try
             {
-                return processes.Length > 0 ? "Running" : "Standby";
+                foreach (var p in processes)
+                {
+                    if (p.Id == current.Id)
+                        continue;
+
+                    try
+                    {
+                        //给进程p发个消息
+
+                        //if (p.MainWindowHandle != IntPtr.Zero)
+                        {
+                            ShowWindowAsync(p.MainWindowHandle, WindowShowStyle.ShowNormal);
+                            SetForegroundWindow(p.MainWindowHandle);
+                            break;
+                        }
+                    }
+                    catch
+                    {
+                        // 忽略无法访问的进程
+                    }
+                }
             }
             finally
             {
-                // 释放进程句柄
                 foreach (var p in processes)
                 {
                     p?.Dispose();
                 }
             }
+
+            current.Dispose();
         }
+
+        /// <summary>
+        /// 改变窗口的显示状态
+        /// </summary>
+        /// <param name="hWnd">窗口句柄</param>
+        /// <param name="style">窗口显示状态常量</param>
+        /// <returns>是否成功</returns>
+        [DllImport("User32.dll")]
+        private static extern bool ShowWindowAsync(IntPtr hWnd, WindowShowStyle style);
+
+        /// <summary>
+        /// 将指定的窗口带到前台并激活它
+        /// </summary>
+        /// <param name="hWnd">窗口句柄</param>
+        /// <returns>是否成功</returns>
+        [DllImport("User32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
     }
+}
+
+public enum WindowShowStyle : int
+{
+    /// <summary>隐藏窗口并激活另一个窗口。</summary>
+    Hide = 0,
+
+    /// <summary>激活并显示窗口。如果窗口最小化或最大化，系统将其还原到其原始大小和位置。</summary>
+    ShowNormal = 1,
+
+    /// <summary>激活窗口并将其显示为最小化窗口。</summary>
+    ShowMinimized = 2,
+
+    /// <summary>激活窗口并将其显示为最大化窗口。</summary>
+    ShowMaximized = 3,
+
+    /// <summary>以最近的大小和位置显示窗口，但不激活它。</summary>
+    ShowNoActivate = 4,
+
+    /// <summary>在当前位置和大小激活并显示窗口。</summary>
+    Show = 5,
+
+    /// <summary>最小化指定的窗口并激活 Z 轴顺序中的下一个顶层窗口。</summary>
+    Minimize = 6,
+
+    /// <summary>将窗口显示为最小化窗口，但不激活它。</summary>
+    ShowMinNoActive = 7,
+
+    /// <summary>以当前状态显示窗口，但不激活它。</summary>
+    ShowNA = 8,
+
+    /// <summary>激活并显示窗口。如果窗口最小化或最大化，系统将其恢复到原始大小和位置。</summary>
+    Restore = 9,
+
+    /// <summary>依据启动应用程序的 STARTUPINFO 结构中指定的 SW_ 值设定显示状态。</summary>
+    ShowDefault = 10,
+
+    /// <summary>即使拥有窗口的线程被挂起，也最小化窗口。在跨进程操作时建议使用此标志。</summary>
+    ForceMinimize = 11
 }

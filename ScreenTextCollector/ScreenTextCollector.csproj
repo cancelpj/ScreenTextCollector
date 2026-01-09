@@ -1,66 +1,47 @@
-<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
-    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{1C3F2201-29F9-4E8C-92B1-61816AF99C65}</ProjectGuid>
-    <OutputType>Exe</OutputType>
-    <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>ScreenTextCollector</RootNamespace>
+    <TargetFramework>net48</TargetFramework>
+    <OutputType>WinExe</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
     <AssemblyName>stc</AssemblyName>
-    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <Deterministic>true</Deterministic>
-    <TargetFrameworkProfile />
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugSymbols>true</DebugSymbols>
-    <DebugType>full</DebugType>
-    <Optimize>false</Optimize>
-    <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <PlatformTarget>AnyCPU</PlatformTarget>
-    <Prefer32Bit>false</Prefer32Bit>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
-    <DefineConstants>TRACE</DefineConstants>
-    <ErrorReport>prompt</ErrorReport>
-    <WarningLevel>4</WarningLevel>
-    <Prefer32Bit>false</Prefer32Bit>
+    <!-- 定义版本号格式：年.月.日.小时分钟 -->
+    <Version>$([System.DateTime]::Now.ToString('yyyy.M.d.HHmm'))</Version>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <!--更改默认输出路径-->
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
   </PropertyGroup>
   <PropertyGroup>
     <StartupObject />
+    <ApplicationIcon>robot_icon-icons.com_60269.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
+    <ProjectReference Include="..\PluginInterface\PluginInterface.csproj" />
+    <ProjectReference Include="..\ScreenTextCollector.OpenCVsharp\ScreenTextCollector.OpenCvSharp.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <Compile Include="Program.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="SimpleMqttClient.cs" />
+  <ItemGroup Label="Compile items now included by globbing that were not in the original project file">
+    <Compile Remove="MemoryLeakDetector.cs" />
   </ItemGroup>
-  <ItemGroup>
-    <None Include="app.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\PluginInterface\PluginInterface.csproj">
-      <Project>{69f0497e-08c8-4bea-8c94-8085c03a417e}</Project>
-      <Name>PluginInterface</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\ScreenTextCollector.OpenCVsharp\ScreenTextCollector.OpenCvSharp.csproj">
-      <Project>{c61ae89f-5951-fc90-49c3-be65bc122445}</Project>
-      <Name>ScreenTextCollector.OpenCvSharp</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <PropertyGroup>
-    <PostBuildEvent>xcopy $(ProjectDir)data\*.png $(ProjectDir)$(OutDir)data\ /Y</PostBuildEvent>
-  </PropertyGroup>
+  <!--<ItemGroup>
+    <Content Include="robot_icon-icons.com_60269.ico" />
+  </ItemGroup>-->
+
+  <Target Name="ReactorCall" AfterTargets="Build">
+    <PropertyGroup>
+      <ReactorStartTime>$([System.DateTime]::Now.ToString("HH:mm:ss"))</ReactorStartTime>
+      <ReactorStartTicks>$([System.DateTime]::Now.Ticks)</ReactorStartTicks>
+    </PropertyGroup>
+    <Message Text=">>> [混淆处理] 开始时间: $(ReactorStartTime)" Importance="high" />
+
+    <Exec Command="dotNET_Reactor.Console.exe -project stc.nrproj" />
+
+    <PropertyGroup>
+      <ReactorEndTicks>$([System.DateTime]::Now.Ticks)</ReactorEndTicks>
+      <ReactorElapsedTicks>$([MSBuild]::Subtract($(ReactorEndTicks), $(ReactorStartTicks)))</ReactorElapsedTicks>
+      <ReactorElapsedSeconds>$([MSBuild]::Divide($(ReactorElapsedTicks), 10000000).ToString("F2"))</ReactorElapsedSeconds>
+    </PropertyGroup>
+    <Message Text=">>> [混淆处理] 结束。耗时: $(ReactorElapsedSeconds) 秒" Importance="high" />
+  </Target>
 </Project>
