@@ -15,10 +15,13 @@ namespace PluginInterface
         public bool CsvRecord { get; set; }
 
         /// <summary>
-        /// 是否启用HTTP服务
+        /// HTTP服务配置
         /// </summary>
         public HttpConfig Http { get; set; }
 
+        /// <summary>
+        /// MQTT推送服务配置
+        /// </summary>
         public MqttBrokerConfig MqttBroker { get; set; }
 
         /// <summary>
@@ -59,6 +62,7 @@ namespace PluginInterface
         public string Username { get; set; }
         public string Password { get; set; }
         public string Topic { get; set; }
+        public string GroupCode { get; set; } = "collection";
     }
 
     /// <summary>

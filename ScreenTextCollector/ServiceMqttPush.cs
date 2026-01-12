@@ -48,7 +48,7 @@ namespace ScreenTextCollector
                                 { "CLIENT", mqttBrokerConfig.ClientId },
                                 { "DEVICECODE", Tool.Settings.DeviceName },
                                 { "EQUIPMENT", Tool.Settings.DeviceName },
-                                { "GROUPCODE", "collection" },
+                                { "GROUPCODE", mqttBrokerConfig.GroupCode },
                                 { "TIMESTAMP", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }
                             };
                             foreach (var item in data)
