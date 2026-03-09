@@ -12,17 +12,28 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
   </PropertyGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>ScreenTextCollector.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
   <PropertyGroup>
     <StartupObject />
     <ApplicationIcon>robot_icon-icons.com_60269.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
+    <AdditionalFiles Remove="app.manifest" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\PluginInterface\PluginInterface.csproj" />
     <ProjectReference Include="..\ScreenTextCollector.OpenCVsharp\ScreenTextCollector.OpenCvSharp.csproj" />
   </ItemGroup>
   <ItemGroup Label="Compile items now included by globbing that were not in the original project file">
     <Compile Remove="MemoryLeakDetector.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="app.manifest" />
   </ItemGroup>
   <!--<ItemGroup>
     <Content Include="robot_icon-icons.com_60269.ico" />
@@ -33,7 +44,7 @@
       <ReactorStartTime>$([System.DateTime]::Now.ToString("HH:mm:ss"))</ReactorStartTime>
       <ReactorStartTicks>$([System.DateTime]::Now.Ticks)</ReactorStartTicks>
     </PropertyGroup>
-    <Message Text=">>> [混淆处理] 开始时间: $(ReactorStartTime)" Importance="high" />
+    <Message Text="&gt;&gt;&gt; [混淆处理] 开始时间: $(ReactorStartTime)" Importance="high" />
 
     <Exec Command="dotNET_Reactor.Console.exe -project stc.nrproj" />
 
@@ -42,6 +53,6 @@
       <ReactorElapsedTicks>$([MSBuild]::Subtract($(ReactorEndTicks), $(ReactorStartTicks)))</ReactorElapsedTicks>
       <ReactorElapsedSeconds>$([MSBuild]::Divide($(ReactorElapsedTicks), 10000000).ToString("F2"))</ReactorElapsedSeconds>
     </PropertyGroup>
-    <Message Text=">>> [混淆处理] 结束。耗时: $(ReactorElapsedSeconds) 秒" Importance="high" />
+    <Message Text="&gt;&gt;&gt; [混淆处理] 结束。耗时: $(ReactorElapsedSeconds) 秒" Importance="high" />
   </Target>
 </Project>

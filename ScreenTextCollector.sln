@@ -1,17 +1,19 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.12.35728.132
+# Visual Studio Version 18
+VisualStudioVersion = 18.3.11312.210 d18.3
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScreenTextCollector.OpenCvSharp", "ScreenTextCollector.OpenCVsharp\ScreenTextCollector.OpenCvSharp.csproj", "{C61AE89F-5951-FC90-49C3-BE65BC122445}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScreenTextCollector.PaddleOCR", "ScreenTextCollector.PaddleOCR\ScreenTextCollector.PaddleOCR.csproj", "{221B3711-8825-456F-B81A-A2CDE326C4FF}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScreenTextCollector", "ScreenTextCollector\ScreenTextCollector.csproj", "{1C3F2201-29F9-4E8C-92B1-61816AF99C65}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PluginInterface", "PluginInterface\PluginInterface.csproj", "{69F0497E-08C8-4BEA-8C94-8085C03A417E}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Setup", "Setup\Setup.csproj", "{DA746922-9ECE-4787-9260-715AE272EB49}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScreenTextCollector.PaddleOCR", "ScreenTextCollector.PaddleOCR\ScreenTextCollector.PaddleOCR.csproj", "{221B3711-8825-456F-B81A-A2CDE326C4FF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScreenTextCollector.Tests", "ScreenTextCollector.Tests\ScreenTextCollector.Tests.csproj", "{8F9A5B7E-3C4D-4E8F-9A1B-2D3E4F5A6B7C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -23,10 +25,6 @@ Global
 		{C61AE89F-5951-FC90-49C3-BE65BC122445}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C61AE89F-5951-FC90-49C3-BE65BC122445}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C61AE89F-5951-FC90-49C3-BE65BC122445}.Release|Any CPU.Build.0 = Release|Any CPU
-		{221B3711-8825-456F-B81A-A2CDE326C4FF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{221B3711-8825-456F-B81A-A2CDE326C4FF}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{221B3711-8825-456F-B81A-A2CDE326C4FF}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{221B3711-8825-456F-B81A-A2CDE326C4FF}.Release|Any CPU.Build.0 = Release|Any CPU
 		{1C3F2201-29F9-4E8C-92B1-61816AF99C65}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{1C3F2201-29F9-4E8C-92B1-61816AF99C65}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1C3F2201-29F9-4E8C-92B1-61816AF99C65}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -39,6 +37,14 @@ Global
 		{DA746922-9ECE-4787-9260-715AE272EB49}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DA746922-9ECE-4787-9260-715AE272EB49}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DA746922-9ECE-4787-9260-715AE272EB49}.Release|Any CPU.Build.0 = Release|Any CPU
+		{221B3711-8825-456F-B81A-A2CDE326C4FF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{221B3711-8825-456F-B81A-A2CDE326C4FF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{221B3711-8825-456F-B81A-A2CDE326C4FF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{221B3711-8825-456F-B81A-A2CDE326C4FF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8F9A5B7E-3C4D-4E8F-9A1B-2D3E4F5A6B7C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8F9A5B7E-3C4D-4E8F-9A1B-2D3E4F5A6B7C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8F9A5B7E-3C4D-4E8F-9A1B-2D3E4F5A6B7C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8F9A5B7E-3C4D-4E8F-9A1B-2D3E4F5A6B7C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
