@@ -39,7 +39,7 @@
     <Content Include="robot_icon-icons.com_60269.ico" />
   </ItemGroup>-->
 
-  <Target Name="ReactorCall" AfterTargets="Build">
+  <!--<Target Name="ReactorCall" AfterTargets="Build">
     <PropertyGroup>
       <ReactorStartTime>$([System.DateTime]::Now.ToString("HH:mm:ss"))</ReactorStartTime>
       <ReactorStartTicks>$([System.DateTime]::Now.Ticks)</ReactorStartTicks>
@@ -54,5 +54,5 @@
       <ReactorElapsedSeconds>$([MSBuild]::Divide($(ReactorElapsedTicks), 10000000).ToString("F2"))</ReactorElapsedSeconds>
     </PropertyGroup>
     <Message Text="&gt;&gt;&gt; [混淆处理] 结束。耗时: $(ReactorElapsedSeconds) 秒" Importance="high" />
-  </Target>
+  </Target>-->
 </Project>
