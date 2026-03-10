@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using PluginInterface;
 using ScreenTextCollector.OpenCvSharp;
 using Xunit;
@@ -11,11 +12,14 @@ namespace ScreenTextCollector.Tests
     /// OcrService 的单元测试
     /// 使用 TestImages 目录下的真实测试数据
     /// </summary>
-    public class OcrServiceTests
+    public class OcrServiceTests : IDisposable
     {
         protected readonly ITestOutputHelper Output;
         private readonly OcrService _ocrService;
         private readonly string _testDataBasePath;
+
+        // 收集所有 OCR 识别结果
+        private static readonly List<string> OcrResults = new List<string>();
 
         public OcrServiceTests(ITestOutputHelper tempOutput)
         {
@@ -23,6 +27,22 @@ namespace ScreenTextCollector.Tests
             _ocrService = new OcrService();
             // 测试数据的基础路径（输出目录）
             _testDataBasePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestData");
+        }
+
+        /// <summary>
+        /// 测试类结束时输出所有 OCR 结果
+        /// </summary>
+        public void Dispose()
+        {
+            if (OcrResults.Count > 0)
+            {
+                Output.WriteLine("\n========== OCR 识别结果汇总 ==========");
+                foreach (var result in OcrResults.OrderBy(a=>a))
+                {
+                    Output.WriteLine(result);
+                }
+                Output.WriteLine("========================================\n");
+            }
         }
 
         [Fact]
@@ -231,22 +251,18 @@ namespace ScreenTextCollector.Tests
             // Act
             var result = _ocrService.PerformOcr(testImagePath, collectionArea);
 
-            // 输出 OCR 识别结果
-            Output.WriteLine($"[{machineName}] {screenshotFile} - {name}: '{result}'");
+            // 收集 OCR 结果到静态列表
+            OcrResults.Add($"[{machineName}] {screenshotFile} - {name}: '{result}'");
 
             // Assert
-            Assert.NotEqual("",result);
+            Assert.NotEqual("", result);
         }
 
         #region 边界测试
 
-        /// <summary>
-        /// 测试不存在的模板文件
-        /// </summary>
         [Fact]
         public void VerifyImage_NotExistTemplate_ShouldReturnFalse()
         {
-            // Arrange
             var testImagePath = Path.Combine(_testDataBasePath, "纵拉机", "test_screenshot_1.png");
             Assert.True(File.Exists(testImagePath), $"测试图片不存在: {testImagePath}");
 
@@ -263,20 +279,13 @@ namespace ScreenTextCollector.Tests
                 }
             };
 
-            // Act
             var result = _ocrService.VerifyImage(testImagePath, verificationAreas);
-
-            // Assert
             Assert.False(result, "不存在的模板应该返回 false");
         }
 
-        /// <summary>
-        /// 测试超出图片范围的区域
-        /// </summary>
         [Fact]
         public void PerformOcr_OutOfRangeArea_ShouldHandleGracefully()
         {
-            // Arrange
             var testImagePath = Path.Combine(_testDataBasePath, "纵拉机", "test_screenshot_1.png");
             Assert.True(File.Exists(testImagePath), $"测试图片不存在: {testImagePath}");
 
@@ -289,7 +298,6 @@ namespace ScreenTextCollector.Tests
                 Height = 100
             };
 
-            // Act & Assert
             try
             {
                 var result = _ocrService.PerformOcr(testImagePath, collectionArea);
