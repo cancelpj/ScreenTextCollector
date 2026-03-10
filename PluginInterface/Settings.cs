@@ -29,6 +29,11 @@ namespace PluginInterface
         /// </summary>
         public int ScreenNumber { get; set; } = 0;
 
+        /// <summary>
+        /// OCR 引擎类型：OpenCvSharp 或 PaddleOCR
+        /// </summary>
+        public string OcrEngine { get; set; } = "OpenCvSharp";
+
         public List<ImageVerificationArea> ImageVerificationAreas { get; set; }
         public List<ImageCollectionArea> ImageCollectionAreas { get; set; }
     }

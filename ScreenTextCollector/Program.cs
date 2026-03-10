@@ -1,5 +1,4 @@
 ﻿using PluginInterface;
-using ScreenTextCollector.OpenCvSharp;
 using SimpleMqttClient;
 using System;
 using System.Diagnostics;
@@ -16,7 +15,7 @@ namespace ScreenTextCollector
     internal static partial class Program
     {
         private static bool _isRunning = true;
-        private static readonly IOcrService OcrService = new OcrService();
+        private static readonly IOcrService OcrService = CreateOcrService();
         private static Thread _mqttPushThread = null;
         private static MqttClient _mqttClient = null; // 保持全局引用便于清理
         private static HttpListener _listener = null; // 保持全局引用便于清理
@@ -130,6 +129,21 @@ namespace ScreenTextCollector
 
             Tool.Log.Info("\n服务已停止");
             Application.Exit();
+        }
+
+        /// <summary>
+        /// 根据配置创建 OCR 服务
+        /// </summary>
+        private static IOcrService CreateOcrService()
+        {
+            var engine = Tool.Settings.OcrEngine?.ToLower() ?? "opencvsharp";
+            switch (engine)
+            {
+                case "paddleocr":
+                    return new ScreenTextCollector.PaddleOCR.OcrService();
+                default:
+                    return new ScreenTextCollector.OpenCvSharp.OcrService();
+            }
         }
 
         private static void ActivateExistingInstance()

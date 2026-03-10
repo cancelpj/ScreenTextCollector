@@ -11,6 +11,8 @@
     <!--更改默认输出路径-->
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <!-- 解决非字符串资源编译问题 -->
+    <GenerateResourceUsePreserializedResources>true</GenerateResourceUsePreserializedResources>
   </PropertyGroup>
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
@@ -28,6 +30,10 @@
   <ItemGroup>
     <ProjectReference Include="..\PluginInterface\PluginInterface.csproj" />
     <ProjectReference Include="..\ScreenTextCollector.OpenCVsharp\ScreenTextCollector.OpenCvSharp.csproj" />
+    <ProjectReference Include="..\ScreenTextCollector.PaddleOCR\ScreenTextCollector.PaddleOCR.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Resources.Extensions" Version="8.0.0" />
   </ItemGroup>
   <ItemGroup Label="Compile items now included by globbing that were not in the original project file">
     <Compile Remove="MemoryLeakDetector.cs" />
