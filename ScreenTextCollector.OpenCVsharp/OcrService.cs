@@ -1,4 +1,4 @@
-﻿using OpenCvSharp;
+using OpenCvSharp;
 using OpenCvSharp.Text;
 using System;
 using System.Collections.Generic;
@@ -13,6 +13,12 @@ namespace ScreenTextCollector.OpenCvSharp
         {
             using (Mat screenShot = Cv2.ImRead(screenShotPath))
             {
+                // 截图文件不存在
+                if (screenShot.Empty())
+                {
+                    return false;
+                }
+
                 // 逐个对比图像检测区域
                 foreach (var area in imageVerificationAreas)
                 {
@@ -20,13 +26,21 @@ namespace ScreenTextCollector.OpenCvSharp
 
                     var path = Path.Combine("data", area.FileName);
                     using (Mat verificationImage = Cv2.ImRead(path))
-                    using (Mat roiImage = screenShot[roi])
-                    using (Mat matResult = new Mat())
                     {
-                        Cv2.MatchTemplate(roiImage, verificationImage, matResult, TemplateMatchModes.CCoeffNormed);
-                        Cv2.MinMaxLoc(matResult, out var minVal, out var maxVal, out var minLoc, out var maxLoc);
+                        // 模板文件不存在，跳过此区域
+                        if (verificationImage.Empty())
+                        {
+                            return false;
+                        }
 
-                        if (maxVal < area.MatchThreshold) return false; // 只要有区域图像对比不通过，就认为未监测到程序画面
+                        using (Mat roiImage = screenShot[roi])
+                        using (Mat matResult = new Mat())
+                        {
+                            Cv2.MatchTemplate(roiImage, verificationImage, matResult, TemplateMatchModes.CCoeffNormed);
+                            Cv2.MinMaxLoc(matResult, out var minVal, out var maxVal, out var minLoc, out var maxLoc);
+
+                            if (maxVal < area.MatchThreshold) return false; // 只要有区域图像对比不通过，就认为未监测到程序画面
+                        }
                     }
                 }
             }
@@ -38,6 +52,11 @@ namespace ScreenTextCollector.OpenCvSharp
         {
             using (Mat screenShot = Cv2.ImRead(screenShotPath, ImreadModes.Color))
             {
+                if (screenShot.Empty())
+                {
+                    return string.Empty;
+                }
+
                 var roi = new Rect(area.TopLeftX, area.TopLeftY, area.Width, area.Height);
 
                 var trainedDataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data/");

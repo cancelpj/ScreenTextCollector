@@ -17,6 +17,29 @@
   <ItemGroup>
     <ProjectReference Include="..\PluginInterface\PluginInterface.csproj" />
     <ProjectReference Include="..\ScreenTextCollector.OpenCvSharp\ScreenTextCollector.OpenCvSharp.csproj" />
-    <ProjectReference Include="..\ScreenTextCollector\ScreenTextCollector.csproj" />
+  </ItemGroup>
+
+  <!-- 复制模板文件到 data 目录（OcrService 从这里加载） -->
+  <ItemGroup>
+    <None Include="..\TestImages\纵拉机\data\*.png">
+      <Link>data\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\TestImages\拉弯机\data\*.png">
+      <Link>data\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <!-- 复制测试截图到测试数据目录 -->
+  <ItemGroup>
+    <None Include="..\TestImages\纵拉机\test_screenshot_*.png">
+      <Link>TestData\纵拉机\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\TestImages\拉弯机\test_screenshot.png">
+      <Link>TestData\拉弯机\%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 </Project>

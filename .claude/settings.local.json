@@ -5,7 +5,8 @@
       "Bash(msbuild:*)",
       "Bash(dotnet restore:*)",
       "Bash(dotnet build:*)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(./ScreenTextCollector.Tests.exe:*)"
     ]
   }
 }
