@@ -17,6 +17,7 @@
   <ItemGroup>
     <ProjectReference Include="..\PluginInterface\PluginInterface.csproj" />
     <ProjectReference Include="..\ScreenTextCollector.OpenCvSharp\ScreenTextCollector.OpenCvSharp.csproj" />
+    <ProjectReference Include="..\ScreenTextCollector.PaddleOCR\ScreenTextCollector.PaddleOCR.csproj" />
   </ItemGroup>
 
   <!-- 复制模板文件到 data 目录（OcrService 从这里加载） -->

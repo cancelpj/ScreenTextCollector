@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using PluginInterface;
-using ScreenTextCollector.OpenCvSharp;
 using Xunit;
 
 namespace ScreenTextCollector.Tests
@@ -15,7 +14,7 @@ namespace ScreenTextCollector.Tests
     public class OcrServiceTests : IDisposable
     {
         protected readonly ITestOutputHelper Output;
-        private readonly OcrService _ocrService;
+        private readonly IOcrService _ocrService;
         private readonly string _testDataBasePath;
 
         // 收集所有 OCR 识别结果
@@ -24,8 +23,7 @@ namespace ScreenTextCollector.Tests
         public OcrServiceTests(ITestOutputHelper tempOutput)
         {
             Output = tempOutput;
-            _ocrService = new OcrService();
-            // 测试数据的基础路径（输出目录）
+            _ocrService = new OpenCvSharp.OcrService();
             _testDataBasePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "TestData");
         }
 
@@ -144,59 +142,6 @@ namespace ScreenTextCollector.Tests
         [InlineData("纵拉机", "test_screenshot_1.png", "V044", 116, 468, 41, 11, 0.2)]
         [InlineData("纵拉机", "test_screenshot_1.png", "V045", 116, 486, 41, 11, -0.1)]
         [InlineData("纵拉机", "test_screenshot_1.png", "V046", 116, 504, 41, 11, -0.1)]
-        //[InlineData("纵拉机", "test_screenshot_1.png", "V047", 468, 468, 41, 11, )]
-        //[InlineData("纵拉机", "test_screenshot_1.png", "V048", 468, 486, 41, 11)]
-        //[InlineData("纵拉机", "test_screenshot_1.png", "V049", 468, 504, 41, 11)]
-        // 第二张截图 test_screenshot_2.png (V001-V010)
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V001", 60, 205, 44, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V002", 111, 205, 44, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V003", 60, 223, 44, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V004", 111, 223, 44, 12)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V005", 60, 242, 44, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V006", 353, 203, 44, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V007", 405, 203, 40, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V008", 353, 219, 42, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V009", 404, 219, 42, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V010", 331, 259, 40, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V011", 385, 259, 40, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V012", 437, 259, 40, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V013", 663, 202, 45, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V014", 712, 202, 45, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V015", 663, 221, 44, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V016", 717, 221, 44, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V017", 665, 240, 44, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V018", 60, 325, 42, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V019", 114, 325, 42, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V020", 60, 344, 42, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V021", 353, 325, 42, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V022", 405, 325, 42, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V023", 353, 345, 42, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V024", 405, 345, 42, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V025", 330, 377, 42, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V026", 383, 377, 42, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V027", 436, 377, 42, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V028", 667, 318, 42, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V029", 722, 318, 42, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V030", 667, 337, 42, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V031", 65, 432, 41, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V032", 65, 450, 42, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V033", 65, 468, 42, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V034", 65, 486, 41, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V035", 65, 504, 41, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V036", 320, 460, 41, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V037", 321, 510, 41, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V038", 434, 505, 41, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V039", 669, 432, 41, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V040", 669, 450, 41, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V041", 669, 468, 41, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V042", 669, 486, 41, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V043", 669, 504, 41, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V044", 116, 468, 41, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V045", 116, 486, 41, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V046", 116, 504, 41, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V047", 468, 468, 41, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V048", 468, 486, 41, 11)]
-        //[InlineData("纵拉机", "test_screenshot_2.png", "V049", 468, 504, 41, 11)]
         #endregion
         #region 拉弯机 OCR 测试数据
         [InlineData("拉弯机", "test_screenshot.png", "V001", 165, 172, 45, 10, 459.6)]
