@@ -9,17 +9,27 @@
     <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <Platforms>x64</Platforms>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release'">
     <DebugType>none</DebugType>
   </PropertyGroup>
   <ItemGroup>
-    <None Remove="data\*.png" />
-  </ItemGroup>
-  <ItemGroup>
     <PackageReference Include="PaddleOCRSharp">
       <Version>6.1.0</Version>
+      <IncludeAssets>all</IncludeAssets>
+      <PrivateAssets>none</PrivateAssets>
     </PackageReference>
+  </ItemGroup>
+  <!-- 显式导入传递依赖的 targets 文件，确保运行时包内容被拷贝到输出目录 -->
+  <PropertyGroup>
+    <PaddleRuntimePath>$(NuGetPackageRoot)paddle.runtime.win_x64\3.3.0.1\build\win_x64</PaddleRuntimePath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="$(PaddleRuntimePath)\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\PluginInterface\PluginInterface.csproj" />
