@@ -8,6 +8,13 @@ namespace ScreenTextCollector.PaddleOCR
 {
     public class OcrService : IOcrService
     {
+        private PaddleOCREngine engine;
+
+        public OcrService()
+        {
+            engine = new PaddleOCREngine();
+        }
+
         /// <summary>
         /// 验证图像：调用 Tool 静态方法
         /// </summary>
@@ -27,7 +34,6 @@ namespace ScreenTextCollector.PaddleOCR
                            new Rectangle(area.TopLeftX, area.TopLeftY, area.Width, area.Height),
                            PixelFormat.Format24bppRgb))
                 {
-                    var engine = new PaddleOCREngine();
                     OCRResult result = engine.DetectText(image);
                     // 后处理：清理和规范化 OCR 结果
                     return PostProcessText(result.Text.Trim(), area);

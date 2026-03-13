@@ -3,6 +3,7 @@ using NLog;
 using NLog.Config;
 using OpenCvSharp;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
@@ -144,7 +145,7 @@ namespace PluginInterface
                 }
 
                 // 图像采集
-                var data = new Dictionary<string, string>();
+                var data = new ConcurrentDictionary<string, string>();
                 Parallel.ForEach(Settings.ImageCollectionAreas, area =>
                 {
                     var text = performOcr(screenShotPath, area);
@@ -176,7 +177,7 @@ namespace PluginInterface
         /// 每个采集项保存在一行（名称, 值）
         /// </summary>
         /// <param name="results">采集结果</param>
-        public static void SaveToCsv(Dictionary<string, string> results)
+        public static void SaveToCsv(IDictionary<string, string> results)
         {
             var saveDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "output");
             if (!Directory.Exists(saveDir))

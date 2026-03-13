@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Threading.Tasks;
 using PluginInterface;
 using Xunit;
 
@@ -204,6 +206,7 @@ namespace ScreenTextCollector.Tests
 
         /// <summary>
         /// 所有采集区域 OCR 测试
+        /// 使用 Parallel.ForEach 并行执行，与实际运行逻辑保持一致
         /// </summary>
         [Theory]
         [ClassData(typeof(ZongLaJiTestData))]
@@ -219,46 +222,61 @@ namespace ScreenTextCollector.Tests
 
             Assert.True(File.Exists(testImagePath), $"测试图片不存在: {testImagePath}");
 
-            Output.WriteLine($"\n========== {machineName} {screenshotFile} OCR 测试 ==========");
+            Output.WriteLine($"\n## {machineName} {screenshotFile} OCR 测试");
 
-            // 循环执行该组内所有 OCR 测试
-            var passedTests = 0;
+            // 将测试数据转换为采集区域
+            var collectionAreas = new List<ImageCollectionArea>();
             foreach (var input in testInputs)
             {
-                var collectionArea = new ImageCollectionArea
+                collectionAreas.Add(new ImageCollectionArea
                 {
                     Name = input.Name,
                     TopLeftX = input.X,
                     TopLeftY = input.Y,
                     Width = input.Width,
                     Height = input.Height
-                };
+                });
+            }
 
-                var result = _ocrService.PerformOcr(testImagePath, collectionArea);
+            // 使用 ConcurrentDictionary 收集并行 OCR 结果
+            var ocrResults = new ConcurrentDictionary<string, string>();
+
+            // 使用 Parallel.ForEach 并行执行 OCR（与实际运行逻辑一致）
+            Parallel.ForEach(collectionAreas, area =>
+            {
+                var result = _ocrService.PerformOcr(testImagePath, area);
+                ocrResults[area.Name] = result;
+            });
+
+            // 验证结果
+            var passedTests = 0;
+            foreach (var input in testInputs)
+            {
+                var result = ocrResults[input.Name];
                 var expected = input.Expected.ToString();
 
                 if (result == expected)
                 {
                     passedTests++;
-                    Output.WriteLine($"  [PASS] {input.Name}: '{result}'");
+                    Output.WriteLine($"- [PASS] {input.Name}: '{result}'");
                 }
                 else
                 {
-                    Output.WriteLine($"  [FAIL] {input.Name}: '{result}' (期望: '{expected}')");
+                    Output.WriteLine($"- [FAIL] {input.Name}: '{result}' (期望: '{expected}')");
                 }
             }
-          
+
             _stopwatch.Stop();
 
             var totalTests = testInputs.Length;
             var passRate = totalTests > 0 ? (passedTests * 100.0 / totalTests) : 0;
-            Output.WriteLine("\n========== OCR 测试统计 ==========");
-            Output.WriteLine($"总测试数: {totalTests}");
-            Output.WriteLine($"通过数: {passedTests}");
-            Output.WriteLine($"失败数: {totalTests - passedTests}");
-            Output.WriteLine($"正确率: {passRate:F2}%");
-            Output.WriteLine($"总耗时: {_stopwatch.ElapsedMilliseconds} ms");
-            Output.WriteLine("===================================\n");
+            Output.WriteLine($"\n## {machineName} {screenshotFile} OCR 测试统计");
+            Output.WriteLine($"- 总测试数: {totalTests}");
+            Output.WriteLine($"- 通过数: {passedTests}");
+            Output.WriteLine($"- 失败数: {totalTests - passedTests}");
+            Output.WriteLine($"- 正确率: {passRate:F2}%");
+            Output.WriteLine($"- 总耗时: {_stopwatch.ElapsedMilliseconds / 1000} s");
+            Output.WriteLine("---\n");
 
         }
 
