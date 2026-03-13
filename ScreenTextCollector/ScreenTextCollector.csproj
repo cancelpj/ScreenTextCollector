@@ -11,6 +11,10 @@
     <GenerateResourceUsePreserializedResources>true</GenerateResourceUsePreserializedResources>
   </PropertyGroup>
   <ItemGroup>
+    <!-- 解决非字符串资源（如 .ico）编译问题 -->
+    <PackageReference Include="System.Resources.Extensions" Version="10.0.5" />
+  </ItemGroup>
+  <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
       <_Parameter1>ScreenTextCollector.Tests</_Parameter1>
     </AssemblyAttribute>
@@ -27,9 +31,6 @@
     <ProjectReference Include="..\PluginInterface\PluginInterface.csproj" />
     <ProjectReference Include="..\ScreenTextCollector.OpenCVsharp\ScreenTextCollector.OpenCvSharp.csproj" />
     <ProjectReference Include="..\ScreenTextCollector.PaddleOCR\ScreenTextCollector.PaddleOCR.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="System.Resources.Extensions" Version="8.0.0" />
   </ItemGroup>
   <ItemGroup Label="Compile items now included by globbing that were not in the original project file">
     <Compile Remove="MemoryLeakDetector.cs" />

@@ -24,7 +24,7 @@
       <Version>6.1.1</Version>
     </PackageReference>
     <PackageReference Include="OpenCvSharp4">
-      <Version>4.13.0.20260302</Version>
+      <Version>4.13.0.20260308</Version>
     </PackageReference>
     <PackageReference Include="OpenCvSharp4.runtime.win">
       <Version>4.13.0.20260302</Version>
