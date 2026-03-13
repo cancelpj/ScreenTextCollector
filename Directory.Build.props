@@ -1,0 +1,18 @@
+﻿<Project>
+  <PropertyGroup>
+    <!--<Platforms>AnyCPU</Platforms>-->
+	  <PlatformTarget>x64</PlatformTarget>
+    <TargetFramework>net48</TargetFramework>
+		<!--更改默认输出路径-->
+		<AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendPlatformToOutputPath>false</AppendPlatformToOutputPath>
+    <!-- 只保留简体中文，其他语言目录都不生成 -->
+    <SatelliteResourceLanguages>zh-Hans</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+
+</Project>

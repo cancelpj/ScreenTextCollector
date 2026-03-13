@@ -1,18 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net48</TargetFramework>
     <OutputType>Library</OutputType>
     <RootNamespace>ScreenTextCollector.PaddleOCR</RootNamespace>
     <AssemblyName>ScreenTextCollector.PaddleOCR</AssemblyName>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <UseWindowsForms>true</UseWindowsForms>
     <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
-    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
-    <Platforms>x64</Platforms>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release'">
-    <DebugType>none</DebugType>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="PaddleOCRSharp">
@@ -23,7 +16,7 @@
   </ItemGroup>
   <!-- 显式导入传递依赖的 targets 文件，确保运行时包内容被拷贝到输出目录 -->
   <PropertyGroup>
-    <PaddleRuntimePath>$(NuGetPackageRoot)paddle.runtime.win_x64\3.3.0.1\build\win_x64</PaddleRuntimePath>
+    <PaddleRuntimePath>$(NuGetPackageRoot)paddle.runtime.win_x64\3.3.0.2\build\win_x64</PaddleRuntimePath>
   </PropertyGroup>
   <ItemGroup>
     <Content Include="$(PaddleRuntimePath)\*.*">

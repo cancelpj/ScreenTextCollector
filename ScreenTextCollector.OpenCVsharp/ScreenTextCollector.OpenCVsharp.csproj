@@ -1,19 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Library</OutputType>
-    <TargetFramework>net48</TargetFramework>
-    <Platforms>AnyCPU;x64</Platforms>
     <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
     <UseWindowsForms>true</UseWindowsForms>
     <!--<ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>-->
-    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <DebugType>none</DebugType>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <DebugType>none</DebugType>
   </PropertyGroup>
   <ItemGroup>
     <None Remove="data\*.png" />
@@ -22,7 +12,7 @@
     <Reference Include="System.ServiceProcess" />
   </ItemGroup>
   <ItemGroup>
-    <None Update="data\eng.traineddata">
+    <None Update="data\*.traineddata">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

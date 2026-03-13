@@ -1,6 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net48</TargetFramework>
     <OutputType>WinExe</OutputType>
     <UseWindowsForms>true</UseWindowsForms>
     <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
@@ -8,12 +7,8 @@
     <!-- 定义版本号格式：年.月.日.小时分钟 -->
     <Version>$([System.DateTime]::Now.ToString('yyyy.M.d.HHmm'))</Version>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
-    <!--更改默认输出路径-->
-    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     <!-- 解决非字符串资源编译问题 -->
     <GenerateResourceUsePreserializedResources>true</GenerateResourceUsePreserializedResources>
-    <Platforms>AnyCPU;x64</Platforms>
   </PropertyGroup>
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
