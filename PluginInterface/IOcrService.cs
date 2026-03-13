@@ -19,5 +19,13 @@ namespace PluginInterface
         /// <param name="imageCollectionArea">采集区域</param>
         /// <returns></returns>
         string PerformOcr(string screenShotPath, ImageCollectionArea imageCollectionArea);
+
+        /// <summary>
+        /// 后处理 OCR 识别结果
+        /// </summary>
+        /// <param name="text">OCR 原始文本</param>
+        /// <param name="area">采集区域配置</param>
+        /// <returns>处理后的文本</returns>
+        string PostProcessText(string text, ImageCollectionArea area);
     }
 }

@@ -1,53 +1,21 @@
 using OpenCvSharp;
 using OpenCvSharp.Text;
+using PluginInterface;
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text.RegularExpressions;
-using PluginInterface;
 
 namespace ScreenTextCollector.OpenCvSharp
 {
     public class OcrService : IOcrService
     {
+        /// <summary>
+        /// 验证图像：调用 Tool 静态方法
+        /// </summary>
         public bool VerifyImage(string screenShotPath, List<ImageVerificationArea> imageVerificationAreas)
         {
-            using (Mat screenShot = Cv2.ImRead(screenShotPath))
-            {
-                // 截图文件不存在
-                if (screenShot.Empty())
-                {
-                    return false;
-                }
-
-                // 逐个对比图像检测区域
-                foreach (var area in imageVerificationAreas)
-                {
-                    var roi = new Rect(area.TopLeftX, area.TopLeftY, area.Width, area.Height);
-
-                    var path = Path.Combine("data", area.FileName);
-                    using (Mat verificationImage = Cv2.ImRead(path))
-                    {
-                        // 模板文件不存在，跳过此区域
-                        if (verificationImage.Empty())
-                        {
-                            return false;
-                        }
-
-                        using (Mat roiImage = screenShot[roi])
-                        using (Mat matResult = new Mat())
-                        {
-                            Cv2.MatchTemplate(roiImage, verificationImage, matResult, TemplateMatchModes.CCoeffNormed);
-                            Cv2.MinMaxLoc(matResult, out var minVal, out var maxVal, out var minLoc, out var maxLoc);
-
-                            if (maxVal < area.MatchThreshold) return false; // 只要有区域图像对比不通过，就认为未监测到程序画面
-                        }
-                    }
-                }
-            }
-
-            return true;
+            return Tool.VerifyImage(screenShotPath, imageVerificationAreas);
         }
 
         public string PerformOcr(string screenShotPath, ImageCollectionArea area)
@@ -111,7 +79,7 @@ namespace ScreenTextCollector.OpenCvSharp
                                     }
 
                                     // 后处理：清理和规范化 OCR 结果
-                                    text = CleanOcrResult(text, area);
+                                    text = PostProcessText(text, area);
 
                                     // 如果有有效结果，返回它
                                     if (!string.IsNullOrWhiteSpace(text) && text.Length > 0)
@@ -134,108 +102,11 @@ namespace ScreenTextCollector.OpenCvSharp
         }
 
         /// <summary>
-        /// 清理 OCR 识别结果
+        /// 后处理 OCR 识别结果：调用 Tool 静态方法
         /// </summary>
-        private string CleanOcrResult(string text, ImageCollectionArea area)
+        public string PostProcessText(string text, ImageCollectionArea area)
         {
-            if (string.IsNullOrWhiteSpace(text))
-                return text;
-
-            // 移除常见 OCR 错误字符
-            text = text.Replace("|", "")
-                       .Replace("_", "")
-                       .Replace("—", "-")
-                       .Replace("'", "")
-                       .Replace("`", "")
-                       .Replace("°", "")
-                       .Replace("(", "")
-                       .Replace(")", "")
-                       .Replace("[", "")
-                       .Replace("]", "")
-                       .Replace("{", "")
-                       .Replace("}", "");
-
-            // 尝试匹配有效的数字格式
-            // 1. 首先尝试匹配带小数的数字 (优先)
-            var match = Regex.Match(text, @"(-?\d+\.\d+)");
-            if (match.Success)
-            {
-                string result = match.Groups[1].Value;
-                // 规范化小数：移除尾随的0，但保留 .0
-                result = NormalizeDecimal(result);
-                return result;
-            }
-
-            // 2. 然后尝试匹配整数
-            match = Regex.Match(text, @"(-?\d+)");
-            if (match.Success)
-            {
-                string numStr = match.Groups[1].Value;
-
-                // 特殊处理：如果文本中有负号，但识别成 "01" 格式
-                // 如 "-0.1" 被识别成 "01"
-                if (text.Contains("-") && numStr.StartsWith("0") && numStr.Length <= 2)
-                {
-                    // 可能是 -0.1 被识别成 01
-                    return "-" + numStr;
-                }
-
-                // 处理 "180701" 这种 - 截取合理长度的数字
-                if (numStr.Length > 4)
-                {
-                    // 尝试分段匹配
-                    var parts = Regex.Split(text, @"\s+");
-                    foreach (var part in parts)
-                    {
-                        var partMatch = Regex.Match(part, @"(-?\d+\.?\d*)");
-                        if (partMatch.Success && !string.IsNullOrEmpty(partMatch.Value) && partMatch.Value.Length <= 5)
-                        {
-                            return NormalizeDecimal(partMatch.Value);
-                        }
-                    }
-
-                    // 如果没找到合适的，截取前4位
-                    return numStr.Substring(0, Math.Min(4, numStr.Length));
-                }
-
-                return numStr;
-            }
-
-            // 如果不是纯数字，检查是否包含有效字符
-            if (text.Length > 0)
-            {
-                // 只保留字母、数字和常见符号
-                var cleaned = Regex.Replace(text, @"[^a-zA-Z0-9\-.\s]", "");
-                if (!string.IsNullOrWhiteSpace(cleaned))
-                    return cleaned.Trim();
-            }
-
-            return text;
-        }
-
-        /// <summary>
-        /// 规范化小数：移除尾随的0
-        /// </summary>
-        private string NormalizeDecimal(string numStr)
-        {
-            if (string.IsNullOrEmpty(numStr))
-                return numStr;
-
-            // 如果是负数，先处理
-            bool isNegative = numStr.StartsWith("-");
-            string absNum = isNegative ? numStr.Substring(1) : numStr;
-
-            // 如果有小数点
-            if (absNum.Contains("."))
-            {
-                // 移除尾随的0
-                absNum = absNum.TrimEnd('0');
-                // 如果最后是小数点，保留一个0
-                if (absNum.EndsWith("."))
-                    absNum += "0";
-            }
-
-            return isNegative ? "-" + absNum : absNum;
+            return Tool.PostProcessText(text, area);
         }
 
         /// <summary>

@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net40</TargetFramework>
+    <TargetFramework>net48</TargetFramework>
     <OutputType>Library</OutputType>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <UseWindowsForms>true</UseWindowsForms>
@@ -24,6 +24,12 @@
     </PackageReference>
     <PackageReference Include="NLog">
       <Version>6.1.1</Version>
+    </PackageReference>
+    <PackageReference Include="OpenCvSharp4">
+      <Version>4.13.0.20260302</Version>
+    </PackageReference>
+    <PackageReference Include="OpenCvSharp4.runtime.win">
+      <Version>4.13.0.20260302</Version>
     </PackageReference>
   </ItemGroup>
 </Project>
