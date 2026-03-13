@@ -10,17 +10,23 @@ using Xunit;
 namespace ScreenTextCollector.Tests
 {
     /// <summary>
-    /// OCR 测试输入数据
+    /// OCR 测试输入数据，继承自 ImageCollectionArea
     /// </summary>
-    public class OcrTestInput
+    public class OcrTestInput : ImageCollectionArea
     {
+        /// <summary>
+        /// 机器名称（测试元数据）
+        /// </summary>
         public string MachineName { get; set; }
+
+        /// <summary>
+        /// 截图文件名（测试元数据）
+        /// </summary>
         public string ScreenshotFile { get; set; }
-        public string Name { get; set; }
-        public int X { get; set; }
-        public int Y { get; set; }
-        public int Width { get; set; }
-        public int Height { get; set; }
+
+        /// <summary>
+        /// 期望的 OCR 识别结果
+        /// </summary>
         public object Expected { get; set; }
 
         public OcrTestInput(string machineName, string screenshotFile, string name, int x, int y, int width, int height, object expected)
@@ -28,8 +34,8 @@ namespace ScreenTextCollector.Tests
             MachineName = machineName;
             ScreenshotFile = screenshotFile;
             Name = name;
-            X = x;
-            Y = y;
+            TopLeftX = x;
+            TopLeftY = y;
             Width = width;
             Height = height;
             Expected = expected;
@@ -224,25 +230,11 @@ namespace ScreenTextCollector.Tests
 
             Output.WriteLine($"\n## {machineName} {screenshotFile} OCR 测试");
 
-            // 将测试数据转换为采集区域
-            var collectionAreas = new List<ImageCollectionArea>();
-            foreach (var input in testInputs)
-            {
-                collectionAreas.Add(new ImageCollectionArea
-                {
-                    Name = input.Name,
-                    TopLeftX = input.X,
-                    TopLeftY = input.Y,
-                    Width = input.Width,
-                    Height = input.Height
-                });
-            }
-
             // 使用 ConcurrentDictionary 收集并行 OCR 结果
             var ocrResults = new ConcurrentDictionary<string, string>();
 
-            // 使用 Parallel.ForEach 并行执行 OCR（与实际运行逻辑一致）
-            Parallel.ForEach(collectionAreas, area =>
+            // 使用 Parallel.ForEach 并行执行 OCR（OcrTestInput 继承自 ImageCollectionArea）
+            Parallel.ForEach(testInputs, area =>
             {
                 var result = _ocrService.PerformOcr(testImagePath, area);
                 ocrResults[area.Name] = result;
