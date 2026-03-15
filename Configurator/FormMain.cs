@@ -10,6 +10,8 @@ namespace Configurator
 {
     public class FormMain : Form
     {
+        private const string Title = "截屏采集标注工具 V1.0";
+
         // 截屏图片
         private Bitmap _screenshot;
 
@@ -36,12 +38,14 @@ namespace Configurator
         // 匹配阈值
         private float _matchThreshold = 0.8f;
 
+        // 是否有未保存的更改
+        private bool _isModify = false;
+
         // 颜色定义（红绿色盲友好）
-        private readonly Color VERIFICATION_COLOR = Color.FromArgb(0, 0, 255); // 蓝色
-        private readonly Color COLLECTION_COLOR = Color.FromArgb(255, 128, 0); // 橙色
+        private Color VERIFICATION_COLOR = Color.FromArgb(0, 0, 255); // 蓝色
+        private Color COLLECTION_COLOR = Color.FromArgb(255, 128, 0); // 橙色
 
         // 控件
-        private MenuStrip _menuStrip;
         private ToolStrip _toolStrip;
         private Panel _imagePanel;
         private SplitContainer _verticalSplit;
@@ -65,7 +69,28 @@ namespace Configurator
         public FormMain()
         {
             InitializeComponent();
+            // 启动时最大化窗口
+            WindowState = FormWindowState.Maximized;
             this.Load += FormMain_Load;
+            this.FormClosing += FormMain_FormClosing;
+        }
+
+        private void FormMain_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            if (_isModify)
+            {
+                var result = MessageBox.Show("检测到未保存的修改，是否保存？", "未保存的更改",
+                    MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+
+                if (result == DialogResult.Yes)
+                {
+                    SaveConfig();
+                }
+                else if (result == DialogResult.Cancel)
+                {
+                    e.Cancel = true;
+                }
+            }
         }
 
         private void FormMain_Load(object sender, EventArgs e)
@@ -116,7 +141,6 @@ namespace Configurator
 
         private void InitializeComponent()
         {
-            this._menuStrip = new System.Windows.Forms.MenuStrip();
             this._toolStrip = new System.Windows.Forms.ToolStrip();
             this._imagePanel = new System.Windows.Forms.Panel();
             // 启用双缓冲，减少闪烁
@@ -134,30 +158,22 @@ namespace Configurator
             this._radioVerification = new System.Windows.Forms.RadioButton();
             this._radioCollection = new System.Windows.Forms.RadioButton();
 
-            // MenuStrip
-            var fileMenuItem = new ToolStripMenuItem("文件(&F)");
-            fileMenuItem.DropDownItems.Add("退出(&X)", null, (s, e) => Application.Exit());
-            var helpMenuItem = new ToolStripMenuItem("帮助(&H)");
-            helpMenuItem.DropDownItems.Add("关于", null, (s, e) =>
-                MessageBox.Show("屏幕区域配置工具\n用于配置屏幕文字采集的检测和采集区域",
-                    "关于", MessageBoxButtons.OK, MessageBoxIcon.Information));
-            this._menuStrip.Items.AddRange(new ToolStripItem[] { fileMenuItem, helpMenuItem });
-            this._menuStrip.Location = new Point(0, 0);
-            this._menuStrip.Name = "_menuStrip";
-            this._menuStrip.Size = new Size(1024, 24);
-            this._menuStrip.TabIndex = 0;
-
             // ToolStrip
             _btnCapture = new ToolStripButton("重新截屏", null, BtnCapture_Click);
             _btnSave = new ToolStripButton("保存配置", null, BtnSave_Click);
             _btnOpenConfig = new ToolStripButton("用记事本打开配置", null, BtnOpenConfig_Click);
+            var btnAbout = new ToolStripButton("关于", null, BtnAbout_Click);
             this._toolStrip.Items.Add(_btnCapture);
             this._toolStrip.Items.Add(_btnSave);
             this._toolStrip.Items.Add(_btnOpenConfig);
             this._toolStrip.Items.Add(this._toolStripSeparator1);
             this._toolStrip.Items.Add(this._toolStripLabel1);
             this._toolStrip.Items.Add(this._thresholdComboBox);
-            this._toolStrip.Location = new Point(0, 24);
+            // 使用 Spring 属性将关于按钮推到右边
+            this._toolStrip.Items.Add(new ToolStripSeparator());
+            btnAbout.Alignment = ToolStripItemAlignment.Right;
+            this._toolStrip.Items.Add(btnAbout);
+            this._toolStrip.Location = new Point(0, 0);
             this._toolStrip.Name = "_toolStrip";
             this._toolStrip.Size = new Size(1024, 25);
             this._toolStrip.TabIndex = 1;
@@ -230,6 +246,7 @@ namespace Configurator
             this._verificationListView.Columns.Add("", 30);
             this._verificationListView.SelectedIndexChanged += VerificationListView_SelectedIndexChanged;
             this._verificationListView.MouseClick += VerificationListView_MouseClick;
+            this._verificationListView.MouseDoubleClick += VerificationListView_MouseDoubleClick;
             this._verificationListView.DrawColumnHeader += ListView_DrawColumnHeader;
             this._verificationListView.DrawSubItem += VerificationListView_DrawSubItem;
             this._verificationGroup.Controls.Add(this._verificationListView);
@@ -258,6 +275,7 @@ namespace Configurator
             this._collectionListView.Columns.Add("", 30);
             this._collectionListView.SelectedIndexChanged += CollectionListView_SelectedIndexChanged;
             this._collectionListView.MouseClick += CollectionListView_MouseClick;
+            this._collectionListView.MouseDoubleClick += CollectionListView_MouseDoubleClick;
             this._collectionListView.DrawColumnHeader += ListView_DrawColumnHeader;
             this._collectionListView.DrawSubItem += CollectionListView_DrawSubItem;
             this._collectionGroup.Controls.Add(this._collectionListView);
@@ -322,12 +340,10 @@ namespace Configurator
             this.ClientSize = new Size(1024, 593);
             this.Controls.Add(this._verticalSplit);
             this.Controls.Add(this._toolStrip);
-            this.Controls.Add(this._menuStrip);
             this.Controls.Add(this._statusStrip);
-            this.MainMenuStrip = this._menuStrip;
             this.Name = "FormMain";
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.Text = "屏幕区域配置工具";
+            this.Text = Title;
         }
 
         #region 工具栏事件
@@ -353,6 +369,12 @@ namespace Configurator
             {
                 MessageBox.Show("配置文件不存在", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
+        }
+
+        private void BtnAbout_Click(object sender, EventArgs e)
+        {
+            MessageBox.Show($"{Title}\n\n用于标注屏幕文字采集的检测和采集区域，生成采集配置文件。",
+                "关于", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private void ThresholdComboBox_SelectedIndexChanged(object sender, EventArgs e)
@@ -802,11 +824,22 @@ namespace Configurator
         }
 
         /// <summary>
-        /// 键盘事件 - Delete 删除选中区域
+        /// 键盘事件 - Delete 删除选中区域, Tab 切换检测/采集区域
         /// </summary>
         private void ImagePanel_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.Delete)
+            if (e.KeyCode == Keys.Tab)
+            {
+                // 切换检测/采集模式
+                _isVerificationMode = !_isVerificationMode;
+
+                // 更新RadioButton状态
+                _radioVerification.Checked = _isVerificationMode;
+                _radioCollection.Checked = !_isVerificationMode;
+
+                e.Handled = true;
+            }
+            else if (e.KeyCode == Keys.Delete)
             {
                 if (_selectedVerificationIndex >= 0)
                 {
@@ -896,6 +929,7 @@ namespace Configurator
                         MatchThreshold = dialog.MatchThreshold
                     };
                     _verificationAreas.Add(area);
+                    _isModify = true;
 
                     // 保存检测区域截图
                     SaveVerificationImage(area);
@@ -921,6 +955,7 @@ namespace Configurator
                         Height = imgHeight
                     };
                     _collectionAreas.Add(area);
+                    _isModify = true;
 
                     RefreshCollectionList();
                     _imagePanel.Invalidate();
@@ -991,8 +1026,9 @@ namespace Configurator
                     (int)(area.Width * scaleX),
                     (int)(area.Height * scaleY));
 
-                var color = i == _selectedVerificationIndex ? Color.Cyan : VERIFICATION_COLOR;
-                DrawArea(e.Graphics, rect, color, "检测: " + Path.GetFileNameWithoutExtension(area.FileName));
+                var frontColor = i == _selectedVerificationIndex ? Color.Cyan : Color.LightSkyBlue;
+                var backColor =  Color.FromArgb(200, Color.Black);
+                DrawArea(e.Graphics, rect, frontColor, backColor, "检测: " + Path.GetFileNameWithoutExtension(area.FileName));
             }
 
             // 绘制采集区域（橙色）
@@ -1005,8 +1041,9 @@ namespace Configurator
                     (int)(area.Width * scaleX),
                     (int)(area.Height * scaleY));
 
-                var color = i == _selectedCollectionIndex ? Color.Yellow : COLLECTION_COLOR;
-                DrawArea(e.Graphics, rect, color, area.Name);
+                var frontColor = i == _selectedCollectionIndex ? Color.Yellow : COLLECTION_COLOR;
+                var backColor = Color.FromArgb(200, Color.Black);
+                DrawArea(e.Graphics, rect, frontColor, backColor, area.Name);
             }
 
             // 绘制当前拖拽的矩形
@@ -1022,12 +1059,12 @@ namespace Configurator
             }
         }
 
-        private void DrawArea(Graphics g, Rectangle rect, Color color, string label)
+        private void DrawArea(Graphics g, Rectangle rect, Color frontColor, Color backColor, string label)
         {
-            using (var pen = new Pen(color, 2))
-            using (var brush = new SolidBrush(Color.FromArgb(50, color)))
+            using (var pen = new Pen(frontColor, 2))
+            using (var brush = new SolidBrush(Color.FromArgb(50, frontColor)))
             using (var font = new Font("Microsoft Sans Serif", 8))
-            using (var textBrush = new SolidBrush(color))
+            using (var textBrush = new SolidBrush(frontColor))
             {
                 // 填充半透明背景
                 g.FillRectangle(brush, rect);
@@ -1035,7 +1072,7 @@ namespace Configurator
                 g.DrawRectangle(pen, rect);
                 // 绘制标签
                 var size = g.MeasureString(label, font);
-                g.FillRectangle(new SolidBrush(Color.FromArgb(200, Color.Black)),
+                g.FillRectangle(new SolidBrush(Color.FromArgb(200, backColor)),
                     rect.X, rect.Y - (int)size.Height - 2, (int)size.Width + 4, (int)size.Height + 2);
                 g.DrawString(label, font, textBrush, rect.X + 2, rect.Y - (int)size.Height - 2);
             }
@@ -1272,6 +1309,7 @@ namespace Configurator
                 var json = Newtonsoft.Json.JsonConvert.SerializeObject(config, Newtonsoft.Json.Formatting.Indented);
                 File.WriteAllText(GetConfigPath(), json);
                 _statusLabel.Text = "配置已保存";
+                _isModify = false;
             }
             catch (Exception ex)
             {
@@ -1321,6 +1359,30 @@ namespace Configurator
             }
         }
 
+        private void VerificationListView_MouseDoubleClick(object sender, MouseEventArgs e)
+        {
+            var listView = sender as ListView;
+            if (listView == null || listView.SelectedItems.Count == 0) return;
+
+            int index = (int)listView.SelectedItems[0].Tag;
+            if (index >= 0 && index < _verificationAreas.Count)
+            {
+                EditVerificationArea(index);
+            }
+        }
+
+        private void CollectionListView_MouseDoubleClick(object sender, MouseEventArgs e)
+        {
+            var listView = sender as ListView;
+            if (listView == null || listView.SelectedItems.Count == 0) return;
+
+            int index = (int)listView.SelectedItems[0].Tag;
+            if (index >= 0 && index < _collectionAreas.Count)
+            {
+                EditCollectionArea(index);
+            }
+        }
+
         private void DeleteVerificationArea(int index)
         {
             if (index >= 0 && index < _verificationAreas.Count)
@@ -1331,6 +1393,7 @@ namespace Configurator
                 if (result == DialogResult.Yes)
                 {
                     _verificationAreas.RemoveAt(index);
+                    _isModify = true;
                     RefreshVerificationList();
 
                     // 删除后重置选中索引
@@ -1355,6 +1418,7 @@ namespace Configurator
                 if (result == DialogResult.Yes)
                 {
                     _collectionAreas.RemoveAt(index);
+                    _isModify = true;
                     RefreshCollectionList();
 
                     // 删除后重置选中索引
@@ -1420,6 +1484,45 @@ namespace Configurator
             {
                 e.DrawDefault = true;
             }
+        }
+
+        /// <summary>
+        /// 捕获键盘事件 - 处理 Tab 键切换检测/采集区域
+        /// </summary>
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == Keys.Tab)
+            {
+                // 切换检测/采集模式
+                _isVerificationMode = !_isVerificationMode;
+
+                // 更新RadioButton状态
+                _radioVerification.Checked = _isVerificationMode;
+                _radioCollection.Checked = !_isVerificationMode;
+
+                // 切换选中区域
+                if (_isVerificationMode)
+                {
+                    if (_selectedVerificationIndex < 0 && _verificationAreas.Count > 0)
+                    {
+                        _selectedVerificationIndex = 0;
+                    }
+                    _selectedCollectionIndex = -1;
+                }
+                else
+                {
+                    if (_selectedCollectionIndex < 0 && _collectionAreas.Count > 0)
+                    {
+                        _selectedCollectionIndex = 0;
+                    }
+                    _selectedVerificationIndex = -1;
+                }
+
+                _imagePanel.Invalidate();
+                return true;
+            }
+
+            return base.ProcessCmdKey(ref msg, keyData);
         }
 
         #endregion
