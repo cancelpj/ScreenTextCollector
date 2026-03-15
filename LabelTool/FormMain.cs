@@ -149,6 +149,17 @@ namespace LabelTool
         /// </summary>
         private void SelectScreenAndCapture(object sender, EventArgs e)
         {
+            // 获取所有屏幕
+            var screens = Screen.AllScreens;
+
+            // 如果只有一个屏幕，直接截屏不弹窗
+            if (screens.Length == 1)
+            {
+                _screenNumber = 0;
+                CaptureScreen(_screenNumber);
+                return;
+            }
+
             using (var screenSelectDialog = new FormScreenSelect())
             {
                 if (screenSelectDialog.ShowDialog() == DialogResult.OK)
@@ -352,7 +363,7 @@ namespace LabelTool
                 Text = "Tab键切换",
                 Location = new Point(210, 6),
                 AutoSize = true,
-                ForeColor = Color.Orange,
+                ForeColor = Color.Fuchsia,
                 Font = new Font("Microsoft YaHei UI", 10F)
             };
             radioPanel.Controls.Add(this._lblTabHint);
@@ -386,7 +397,7 @@ namespace LabelTool
 
         private void BtnCapture_Click(object sender, EventArgs e)
         {
-            CaptureScreen();
+            SelectScreenAndCapture(sender, e);
         }
 
         private void BtnSave_Click(object sender, EventArgs e)
