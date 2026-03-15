@@ -31,44 +31,62 @@ namespace LabelTool
             this._screenListBox = new System.Windows.Forms.ListBox();
             this._btnOk = new System.Windows.Forms.Button();
             this._btnCancel = new System.Windows.Forms.Button();
-
+            this.SuspendLayout();
+            // 
+            // _lblTitle
+            // 
+            this._lblTitle.AutoSize = true;
+            this._lblTitle.Font = new System.Drawing.Font("Microsoft Sans Serif", 10F, System.Drawing.FontStyle.Bold);
+            this._lblTitle.Location = new System.Drawing.Point(20, 20);
+            this._lblTitle.Name = "_lblTitle";
+            this._lblTitle.Size = new System.Drawing.Size(158, 17);
+            this._lblTitle.TabIndex = 0;
+            this._lblTitle.Text = "请选择要采集的屏幕：";
+            // 
+            // _screenListBox
+            // 
+            this._screenListBox.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this._screenListBox.ItemHeight = 15;
+            this._screenListBox.Location = new System.Drawing.Point(20, 50);
+            this._screenListBox.Name = "_screenListBox";
+            this._screenListBox.Size = new System.Drawing.Size(340, 214);
+            this._screenListBox.TabIndex = 1;
+            // 
+            // _btnOk
+            // 
+            this._btnOk.DialogResult = System.Windows.Forms.DialogResult.OK;
+            this._btnOk.Location = new System.Drawing.Point(200, 276);
+            this._btnOk.Name = "_btnOk";
+            this._btnOk.Size = new System.Drawing.Size(75, 30);
+            this._btnOk.TabIndex = 2;
+            this._btnOk.Text = "确定";
+            // 
+            // _btnCancel
+            // 
+            this._btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
+            this._btnCancel.Location = new System.Drawing.Point(285, 276);
+            this._btnCancel.Name = "_btnCancel";
+            this._btnCancel.Size = new System.Drawing.Size(75, 30);
+            this._btnCancel.TabIndex = 3;
+            this._btnCancel.Text = "取消";
+            // 
             // FormScreenSelect
-            this.Text = "选择屏幕";
-            this.Size = new Size(400, 350);
-            this.FormBorderStyle = FormBorderStyle.FixedDialog;
+            // 
+            this.BackColor = System.Drawing.Color.White;
+            this.ClientSize = new System.Drawing.Size(384, 311);
+            this.Controls.Add(this._lblTitle);
+            this.Controls.Add(this._screenListBox);
+            this.Controls.Add(this._btnOk);
+            this.Controls.Add(this._btnCancel);
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
-            this.StartPosition = FormStartPosition.CenterScreen;
-            this.BackColor = Color.White;
+            this.Name = "FormScreenSelect";
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
+            this.Text = "选择屏幕";
+            this.ResumeLayout(false);
+            this.PerformLayout();
 
-            // _lblTitle
-            this._lblTitle.Text = "请选择要采集的屏幕：";
-            this._lblTitle.Location = new Point(20, 20);
-            this._lblTitle.Font = new Font("Microsoft Sans Serif", 10F, FontStyle.Bold);
-            this._lblTitle.AutoSize = true;
-            this.Controls.Add(this._lblTitle);
-
-            // _screenListBox
-            this._screenListBox.Location = new Point(20, 50);
-            this._screenListBox.Size = new Size(340, 220);
-            this._screenListBox.Font = new Font("Microsoft Sans Serif", 9F);
-            this._screenListBox.DoubleClick += ScreenListBox_DoubleClick;
-            this.Controls.Add(this._screenListBox);
-
-            // _btnOk
-            this._btnOk.Text = "确定";
-            this._btnOk.Location = new Point(200, 285);
-            this._btnOk.Size = new Size(75, 30);
-            this._btnOk.DialogResult = DialogResult.OK;
-            this._btnOk.Click += BtnOk_Click;
-            this.Controls.Add(this._btnOk);
-
-            // _btnCancel
-            this._btnCancel.Text = "取消";
-            this._btnCancel.Location = new Point(285, 285);
-            this._btnCancel.Size = new Size(75, 30);
-            this._btnCancel.DialogResult = DialogResult.Cancel;
-            this.Controls.Add(this._btnCancel);
         }
 
         private void LoadScreens()

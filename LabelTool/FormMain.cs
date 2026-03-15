@@ -64,6 +64,7 @@ namespace LabelTool
         private ToolStripComboBox _thresholdComboBox;
         private RadioButton _radioVerification;
         private RadioButton _radioCollection;
+        private Label _lblTabHint;
         private ToolTip _toolTip;
         private ToolStripButton _btnCapture;
         private ToolStripButton _btnSave;
@@ -346,6 +347,15 @@ namespace LabelTool
                 Dock = DockStyle.Bottom,
                 Height = 35
             };
+            this._lblTabHint = new Label
+            {
+                Text = "Tab键切换",
+                Location = new Point(210, 6),
+                AutoSize = true,
+                ForeColor = Color.Orange,
+                Font = new Font("Microsoft YaHei UI", 10F)
+            };
+            radioPanel.Controls.Add(this._lblTabHint);
             radioPanel.Controls.Add(this._radioVerification);
             radioPanel.Controls.Add(this._radioCollection);
             this._radioVerification.Location = new Point(10, 8);
