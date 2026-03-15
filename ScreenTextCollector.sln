@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScreenTextCollector.PaddleO
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScreenTextCollector.Tests", "ScreenTextCollector.Tests\ScreenTextCollector.Tests.csproj", "{8F9A5B7E-3C4D-4E8F-9A1B-2D3E4F5A6B7C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Configurator", "Configurator\Configurator.csproj", "{0A92EC68-47AF-A960-23B3-55E0AF8E93FE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -45,6 +47,10 @@ Global
 		{8F9A5B7E-3C4D-4E8F-9A1B-2D3E4F5A6B7C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8F9A5B7E-3C4D-4E8F-9A1B-2D3E4F5A6B7C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8F9A5B7E-3C4D-4E8F-9A1B-2D3E4F5A6B7C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0A92EC68-47AF-A960-23B3-55E0AF8E93FE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0A92EC68-47AF-A960-23B3-55E0AF8E93FE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0A92EC68-47AF-A960-23B3-55E0AF8E93FE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0A92EC68-47AF-A960-23B3-55E0AF8E93FE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

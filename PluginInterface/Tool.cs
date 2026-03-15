@@ -132,6 +132,13 @@ namespace PluginInterface
             }
         }
 
+        /// <summary>
+        /// 处理屏幕截图，执行图像校验和OCR文字采集
+        /// </summary>
+        /// <param name="screenShotPath">屏幕截图文件路径</param>
+        /// <param name="verifyImage">图像校验委托，用于验证截图是否符合预期条件</param>
+        /// <param name="performOcr">OCR识别委托，用于从图像采集区域提取文字</param>
+        /// <returns>处理结果。成功时返回JSON格式的采集数据；校验失败时返回警告信息；异常时返回错误信息</returns>
         public static MethodResult ProcessScreenCapture(string screenShotPath, Func<string, List<ImageVerificationArea>, bool> verifyImage,
             Func<string, ImageCollectionArea, string> performOcr)
         {
