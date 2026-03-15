@@ -5,49 +5,72 @@ using Xunit;
 namespace ScreenTextCollector.Tests
 {
     /// <summary>
-    /// Settings 配置类的单元测试
+    /// 配置类的单元测试
     /// </summary>
     public class SettingsTests
     {
         [Fact]
-        public void Settings_DefaultValues_ShouldBeCorrect()
+        public void AppSettings_DefaultValues_ShouldBeCorrect()
         {
             // Arrange & Act
-            var settings = new Settings();
+            var settings = new AppSettings();
 
             // Assert
-            Assert.Equal(0, settings.ScreenNumber);
             Assert.Null(settings.DeviceName);
             Assert.False(settings.CsvRecord);
             Assert.Null(settings.Http);
             Assert.Null(settings.MqttBroker);
-            Assert.Null(settings.ImageVerificationAreas);
-            Assert.Null(settings.ImageCollectionAreas);
+            Assert.Equal("OpenCvSharp", settings.OcrEngine);
         }
 
         [Fact]
-        public void Settings_Properties_CanBeSet()
+        public void AppSettings_Properties_CanBeSet()
         {
             // Arrange
-            var settings = new Settings
+            var settings = new AppSettings
             {
                 DeviceName = "测试设备",
-                ScreenNumber = 1,
                 CsvRecord = true,
+                OcrEngine = "PaddleOCR",
                 Http = new HttpConfig { EnableHttp = true, Ip = "127.0.0.1", Port = 8080 },
-                MqttBroker = new MqttBrokerConfig { EnableMqttPush = true, Ip = "localhost", Port = 1883 },
-                ImageVerificationAreas = new List<ImageVerificationArea>(),
-                ImageCollectionAreas = new List<ImageCollectionArea>()
+                MqttBroker = new MqttBrokerConfig { EnableMqttPush = true, Ip = "localhost", Port = 1883 }
             };
 
             // Assert
             Assert.Equal("测试设备", settings.DeviceName);
-            Assert.Equal(1, settings.ScreenNumber);
             Assert.True(settings.CsvRecord);
+            Assert.Equal("PaddleOCR", settings.OcrEngine);
             Assert.NotNull(settings.Http);
             Assert.NotNull(settings.MqttBroker);
-            Assert.NotNull(settings.ImageVerificationAreas);
-            Assert.NotNull(settings.ImageCollectionAreas);
+        }
+
+        [Fact]
+        public void CaptureSettings_DefaultValues_ShouldBeCorrect()
+        {
+            // Arrange & Act
+            var settings = new CaptureSettings();
+
+            // Assert
+            Assert.Equal(0, settings.ScreenNumber);
+            Assert.Null(settings.VerificationAreas);
+            Assert.Null(settings.CollectionAreas);
+        }
+
+        [Fact]
+        public void CaptureSettings_Properties_CanBeSet()
+        {
+            // Arrange
+            var settings = new CaptureSettings
+            {
+                ScreenNumber = 1,
+                VerificationAreas = new List<ImageVerificationArea>(),
+                CollectionAreas = new List<ImageCollectionArea>()
+            };
+
+            // Assert
+            Assert.Equal(1, settings.ScreenNumber);
+            Assert.NotNull(settings.VerificationAreas);
+            Assert.NotNull(settings.CollectionAreas);
         }
 
         [Fact]

@@ -1,43 +1,7 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 
 namespace PluginInterface
 {
-    public class Settings
-    {
-        /// <summary>
-        /// 采集点名称
-        /// </summary>
-        public string DeviceName { get; set; }
-
-        /// <summary>
-        /// 本地 csv 文件记录
-        /// </summary>
-        public bool CsvRecord { get; set; }
-
-        /// <summary>
-        /// HTTP服务配置
-        /// </summary>
-        public HttpConfig Http { get; set; }
-
-        /// <summary>
-        /// MQTT推送服务配置
-        /// </summary>
-        public MqttBrokerConfig MqttBroker { get; set; }
-
-        /// <summary>
-        /// 屏幕编号，从 0 开始
-        /// </summary>
-        public int ScreenNumber { get; set; } = 0;
-
-        /// <summary>
-        /// OCR 引擎类型：OpenCvSharp 或 PaddleOCR
-        /// </summary>
-        public string OcrEngine { get; set; } = "OpenCvSharp";
-
-        public List<ImageVerificationArea> ImageVerificationAreas { get; set; }
-        public List<ImageCollectionArea> ImageCollectionAreas { get; set; }
-    }
-
     public class HttpConfig
     {
         /// <summary>

@@ -7,18 +7,27 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using LogLevel = NLog.LogLevel;
-using Point = System.Drawing.Point;
 
 namespace PluginInterface
 {
     public static class Tool
     {
-        public static readonly Settings Settings =
-            JsonConvert.DeserializeObject<Settings>(File.ReadAllText("appsettings.json"));
+        /// <summary>
+        /// 应用程序配置（从 appsettings.json 加载）
+        /// </summary>
+        public static readonly AppSettings Settings =
+            JsonConvert.DeserializeObject<AppSettings>(File.ReadAllText("appsettings.json"));
+
+        /// <summary>
+        /// 屏幕采集配置（从 CaptureSettings.json 加载）
+        /// 由 LabelTool 生成和维护
+        /// </summary>
+        public static readonly CaptureSettings CaptureSettings =
+            File.Exists("CaptureSettings.json")
+                ? JsonConvert.DeserializeObject<CaptureSettings>(File.ReadAllText("CaptureSettings.json"))
+                : new CaptureSettings();
 
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
 
@@ -57,38 +66,6 @@ namespace PluginInterface
         #endregion
 
         /// <summary>
-        /// 保存设置
-        /// </summary>
-        /// <returns></returns>
-        public static MethodResult SaveSettings()
-        {
-            try
-            {
-                var json = JsonConvert.SerializeObject(Settings, Formatting.Indented);
-                File.WriteAllText("appsettings.json", json);
-            }
-            catch (Exception ex)
-            {
-                var result = new MethodResult("保存设置失败", ex);
-                OutputMessage(result);
-            }
-
-            return new MethodResult();
-        }
-
-        /// <summary>
-        /// 复制配置文件备份
-        /// </summary>
-        public static void BackupSettingFile()
-        {
-            var filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json");
-            var bakFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
-                $"appsettings-{DateTime.Now:yyyyMMddHHmmssfff}.json");
-            if (File.Exists(filePath))
-                File.Copy(filePath, bakFilePath, true);
-        }
-
-        /// <summary>
         /// 截屏
         /// </summary>
         /// <returns>截图保存路径</returns>
@@ -104,12 +81,12 @@ namespace PluginInterface
 
                 var path = Path.Combine(tempDir, $"{DateTime.Now:yyyyMMddHHmmssfff}.png");
 
-                if (Screen.AllScreens.Length - 1 < Settings.ScreenNumber)
+                if (Screen.AllScreens.Length - 1 < CaptureSettings.ScreenNumber)
                 {
                     return new MethodResult("屏幕编号超出范围");
                 }
 
-                Screen screen = Screen.AllScreens[Settings.ScreenNumber];
+                Screen screen = Screen.AllScreens[CaptureSettings.ScreenNumber];
                 Rectangle bounds = screen.Bounds;
                 using (var screenShot = new Bitmap(bounds.Width, bounds.Height))
                 {
@@ -144,7 +121,7 @@ namespace PluginInterface
             try
             {
                 // 图像校验
-                if (!verifyImage(screenShotPath, Settings.ImageVerificationAreas))
+                if (!verifyImage(screenShotPath, CaptureSettings.VerificationAreas))
                 {
                     File.Delete(screenShotPath);
                     return new MethodResult("未监测到程序画面", MethodResultType.Warning);
@@ -152,7 +129,7 @@ namespace PluginInterface
 
                 // 图像采集
                 var data = new ConcurrentDictionary<string, string>();
-                Parallel.ForEach(Settings.ImageCollectionAreas, area =>
+                Parallel.ForEach(CaptureSettings.CollectionAreas, area =>
                 {
                     var text = performOcr(screenShotPath, area);
                     data[area.Name] = text;

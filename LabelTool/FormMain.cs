@@ -1229,7 +1229,7 @@ namespace LabelTool
 
         private string GetConfigPath()
         {
-            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.json");
+            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CaptureSettings.json");
         }
 
         private string GetScreenshotPath()
@@ -1305,7 +1305,6 @@ namespace LabelTool
                 {
                     _verificationAreas = config.VerificationAreas ?? new List<ImageVerificationArea>();
                     _collectionAreas = config.CollectionAreas ?? new List<ImageCollectionArea>();
-                    _matchThreshold = config.MatchThreshold;
                     _screenNumber = config.ScreenNumber;
 
                     // 检查屏幕编号是否越界
@@ -1358,7 +1357,6 @@ namespace LabelTool
                 {
                     VerificationAreas = _verificationAreas,
                     CollectionAreas = _collectionAreas,
-                    MatchThreshold = _matchThreshold,
                     ScreenNumber = _screenNumber
                 };
 
@@ -1600,7 +1598,6 @@ namespace LabelTool
     {
         public List<ImageVerificationArea> VerificationAreas { get; set; }
         public List<ImageCollectionArea> CollectionAreas { get; set; }
-        public float MatchThreshold { get; set; } = 0.8f;
         public int ScreenNumber { get; set; } = 0;
     }
 }
