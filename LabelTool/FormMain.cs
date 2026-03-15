@@ -10,7 +10,7 @@ namespace LabelTool
 {
     public class FormMain : Form
     {
-        private const string Title = "截屏采集标注工具 V1.0";
+        private const string Title = "截屏采集标注工具 V1.2";
 
         // 截屏图片
         private Bitmap _screenshot;
@@ -69,14 +69,50 @@ namespace LabelTool
         private ToolStripButton _btnCapture;
         private ToolStripButton _btnSave;
         private ToolStripButton _btnOpenConfig;
+        private ToolStripButton _btnAbout;
 
         public FormMain()
         {
             InitializeComponent();
+            // 设置应用图标（从文件加载）
+            var resourcesDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources");
+            var appIconPath = Path.Combine(resourcesDir, "Application.png");
+            if (File.Exists(appIconPath))
+            {
+                using (var bmp = new Bitmap(appIconPath))
+                {
+                    this.Icon = Icon.FromHandle(bmp.GetHicon());
+                }
+            }
+            // 启用键盘快捷键捕获
+            this.KeyPreview = true;
+            this.KeyDown += FormMain_KeyDown;
             // 启动时最大化窗口
             WindowState = FormWindowState.Maximized;
             this.Load += FormMain_Load;
             this.FormClosing += FormMain_FormClosing;
+        }
+
+        private void FormMain_KeyDown(object sender, KeyEventArgs e)
+        {
+            // Ctrl+R: 重新截屏
+            if (e.Control && e.KeyCode == Keys.R)
+            {
+                BtnCapture_Click(this, EventArgs.Empty);
+                e.SuppressKeyPress = true;
+            }
+            // Ctrl+S: 保存配置
+            else if (e.Control && e.KeyCode == Keys.S)
+            {
+                BtnSave_Click(this, EventArgs.Empty);
+                e.SuppressKeyPress = true;
+            }
+            // Ctrl+O: 用记事本打开配置
+            else if (e.Control && e.KeyCode == Keys.O)
+            {
+                BtnOpenConfig_Click(this, EventArgs.Empty);
+                e.SuppressKeyPress = true;
+            }
         }
 
         private void FormMain_FormClosing(object sender, FormClosingEventArgs e)
@@ -197,10 +233,18 @@ namespace LabelTool
             this._radioCollection = new System.Windows.Forms.RadioButton();
 
             // ToolStrip
-            _btnCapture = new ToolStripButton("重新截屏", null, BtnCapture_Click);
-            _btnSave = new ToolStripButton("保存配置", null, BtnSave_Click);
-            _btnOpenConfig = new ToolStripButton("用记事本打开配置", null, BtnOpenConfig_Click);
-            var btnAbout = new ToolStripButton("关于", null, BtnAbout_Click);
+            // 加载图标资源
+            var resourcesDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources");
+            var screenshotIcon = LoadIconFromResources(resourcesDir, "Screenshot.png");
+            var saveIcon = LoadIconFromResources(resourcesDir, "Save.png");
+            var openIcon = LoadIconFromResources(resourcesDir, "Open.png");
+            var aboutIcon = SystemIcons.Information.ToBitmap();
+
+            // ToolStrip
+            _btnCapture = new ToolStripButton("重新截屏 Ctrl+R", screenshotIcon, BtnCapture_Click);
+            _btnSave = new ToolStripButton("保存配置 Ctrl+S", saveIcon, BtnSave_Click);
+            _btnOpenConfig = new ToolStripButton("用记事本打开配置 Ctrl+O", openIcon, BtnOpenConfig_Click);
+            _btnAbout = new ToolStripButton("关于", aboutIcon, BtnAbout_Click);
             this._toolStrip.Items.Add(_btnCapture);
             this._toolStrip.Items.Add(_btnSave);
             this._toolStrip.Items.Add(_btnOpenConfig);
@@ -209,8 +253,8 @@ namespace LabelTool
             this._toolStrip.Items.Add(this._thresholdComboBox);
             // 使用 Spring 属性将关于按钮推到右边
             this._toolStrip.Items.Add(new ToolStripSeparator());
-            btnAbout.Alignment = ToolStripItemAlignment.Right;
-            this._toolStrip.Items.Add(btnAbout);
+            _btnAbout.Alignment = ToolStripItemAlignment.Right;
+            this._toolStrip.Items.Add(_btnAbout);
             this._toolStrip.Location = new Point(0, 0);
             this._toolStrip.Name = "_toolStrip";
             this._toolStrip.Size = new Size(1024, 25);
@@ -1253,6 +1297,16 @@ namespace LabelTool
             return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CaptureSettings.json");
         }
 
+        private Image LoadIconFromResources(string resourcesDir, string fileName)
+        {
+            var path = Path.Combine(resourcesDir, fileName);
+            if (File.Exists(path))
+            {
+                return Image.FromFile(path);
+            }
+            return null;
+        }
+
         private string GetScreenshotPath()
         {
             return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config_screen.png");
@@ -1299,7 +1353,11 @@ namespace LabelTool
                 if (File.Exists(path))
                 {
                     _screenshot?.Dispose();
-                    _screenshot = new Bitmap(path);
+                    // 先从文件读取，然后用克隆创建新Bitmap以释放文件锁
+                    using (var tempBmp = new Bitmap(path))
+                    {
+                        _screenshot = new Bitmap(tempBmp);
+                    }
                     _imagePanel.Invalidate();
                     _statusLabel.Text = $"截图已加载: {_screenshot.Width}x{_screenshot.Height}";
                 }
@@ -1369,10 +1427,7 @@ namespace LabelTool
                 var screenshotPath = GetScreenshotPath();
 
                 // 保存截图
-                if (_screenshot != null)
-                {
-                    _screenshot.Save(screenshotPath);
-                }
+                _screenshot?.Save(screenshotPath, System.Drawing.Imaging.ImageFormat.Png);
 
                 var config = new ConfigData
                 {
