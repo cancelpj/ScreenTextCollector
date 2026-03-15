@@ -38,6 +38,9 @@ namespace LabelTool
         // 匹配阈值
         private float _matchThreshold = 0.8f;
 
+        // 当前屏幕编号
+        private int _screenNumber = 0;
+
         // 是否有未保存的更改
         private bool _isModify = false;
 
@@ -121,14 +124,15 @@ namespace LabelTool
                 }
                 else
                 {
-                    // 清除旧配置
+                    // 清除旧配置，弹出屏幕选择对话框
                     DeleteOldConfig();
+                    SelectScreenAndCapture(sender, e);
                 }
             }
             else
             {
-                // 没有配置文件，直接截屏
-                BtnCapture_Click(sender, e);
+                // 没有配置文件，弹出屏幕选择对话框
+                SelectScreenAndCapture(sender, e);
             }
 
             // 设置默认选中检测区域
@@ -137,6 +141,28 @@ namespace LabelTool
 
             // 更新状态栏
             _statusLabel.Text = "就绪";
+        }
+
+        /// <summary>
+        /// 选择屏幕并截屏
+        /// </summary>
+        private void SelectScreenAndCapture(object sender, EventArgs e)
+        {
+            using (var screenSelectDialog = new FormScreenSelect())
+            {
+                if (screenSelectDialog.ShowDialog() == DialogResult.OK)
+                {
+                    _screenNumber = screenSelectDialog.SelectedScreenNumber;
+                    // 使用选中的屏幕截屏
+                    CaptureScreen(_screenNumber);
+                }
+                else
+                {
+                    // 用户取消，使用默认主屏幕
+                    _screenNumber = 0;
+                    CaptureScreen(_screenNumber);
+                }
+            }
         }
 
         private void InitializeComponent()
@@ -391,6 +417,15 @@ namespace LabelTool
 
         private void CaptureScreen()
         {
+            CaptureScreen(_screenNumber);
+        }
+
+        /// <summary>
+        /// 截取指定屏幕
+        /// </summary>
+        /// <param name="screenNumber">屏幕编号</param>
+        private void CaptureScreen(int screenNumber)
+        {
             try
             {
                 // 禁用 ToolTip，避免截屏时捕获到 ToolTip
@@ -403,12 +438,24 @@ namespace LabelTool
                 this.Hide();
                 System.Threading.Thread.Sleep(300);
 
-                // 使用主屏幕截屏
-                var screenBounds = Screen.PrimaryScreen.Bounds;
+                // 获取所有屏幕
+                var screens = Screen.AllScreens;
+
+                // 检查屏幕编号是否越界
+                if (screenNumber >= screens.Length)
+                {
+                    screenNumber = 0; // 越界时使用主屏幕
+                }
+
+                // 获取指定屏幕
+                var screen = screens[screenNumber];
+                var screenBounds = screen.Bounds;
+
                 _screenshot = new Bitmap(screenBounds.Width, screenBounds.Height);
                 using (var g = Graphics.FromImage(_screenshot))
                 {
-                    g.CopyFromScreen(new Point(0, 0), Point.Empty, screenBounds.Size);
+                    // 从屏幕的实际位置开始截取（考虑多屏幕偏移）
+                    g.CopyFromScreen(screenBounds.Left, screenBounds.Top, 0, 0, screenBounds.Size);
                 }
 
                 // 显示窗体
@@ -1259,6 +1306,14 @@ namespace LabelTool
                     _verificationAreas = config.VerificationAreas ?? new List<ImageVerificationArea>();
                     _collectionAreas = config.CollectionAreas ?? new List<ImageCollectionArea>();
                     _matchThreshold = config.MatchThreshold;
+                    _screenNumber = config.ScreenNumber;
+
+                    // 检查屏幕编号是否越界
+                    var screens = Screen.AllScreens;
+                    if (_screenNumber >= screens.Length)
+                    {
+                        _screenNumber = 0;
+                    }
 
                     // 加载截图
                     var screenshotPath = GetScreenshotPath();
@@ -1303,7 +1358,8 @@ namespace LabelTool
                 {
                     VerificationAreas = _verificationAreas,
                     CollectionAreas = _collectionAreas,
-                    MatchThreshold = _matchThreshold
+                    MatchThreshold = _matchThreshold,
+                    ScreenNumber = _screenNumber
                 };
 
                 var json = Newtonsoft.Json.JsonConvert.SerializeObject(config, Newtonsoft.Json.Formatting.Indented);
@@ -1545,5 +1601,6 @@ namespace LabelTool
         public List<ImageVerificationArea> VerificationAreas { get; set; }
         public List<ImageCollectionArea> CollectionAreas { get; set; }
         public float MatchThreshold { get; set; } = 0.8f;
+        public int ScreenNumber { get; set; } = 0;
     }
 }
