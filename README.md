@@ -65,3 +65,51 @@ Windows 64 位操作系统（32 位很慢）
 ## 使用方法
 
 运行`ScreenTextCollector.exe`即可开始采集，关闭窗口即可停止采集。运行期间要保持目标屏幕画面不被遮挡。
+
+---
+
+## 开发说明
+
+### 工程结构
+
+```
+ScreenTextCollector/
+├── ScreenTextCollector/          # 主程序（WinForms应用）
+│   ├── Program.cs               # 入口点，单实例运行检查
+│   ├── Form1.cs                 # 主窗体，日志UI展示
+│   ├── ServiceMqttPush.cs       # MQTT推送服务
+│   ├── ServiceWebApi.cs         # HTTP服务
+│   ├── SimpleMqttClient.cs      # 自定义MQTT客户端
+│   └── FunctionCall.cs          # 核心业务逻辑
+├── PluginInterface/              # 共享接口和工具类
+│   ├── Tool.cs                  # 工具类（日志广播、截屏、CSV保存）
+│   ├── Settings.cs              # 配置模型
+│   ├── IOcrService.cs           # OCR服务接口
+│   └── NLogGuiTarget.cs         # NLog自定义目标
+├── LabelTool/                    # 图形化标注工具
+├── ScreenTextCollector.OpenCvSharp/  # OpenCvSharp OCR实现（可选）
+├── ScreenTextCollector.PaddleOCR/     # PaddleOCR OCR实现
+└── ScreenTextCollector.Tests/    # 单元测试项目
+```
+
+### 构建命令
+
+```bash
+# 使用 MSBuild 构建Release版本
+msbuild ScreenTextCollector.sln /p:Configuration=Release
+
+# 或使用 dotnet build
+dotnet build ScreenTextCollector/ScreenTextCollector.csproj -c Release
+
+# 使用一键发布脚本（推荐）
+publish.bat
+```
+
+### 发布说明
+
+运行 `publish.bat` 会将两个可执行文件发布到 `publish` 目录：
+- `ScreenTextCollector.exe` - 主程序
+- `LabelTool.exe` - 标注工具
+
+发布前需确保已安装 Visual Studio 2019 或更高版本，并配置好 MSBuild 路径。
+
