@@ -7,7 +7,7 @@ cd %nowPath%
 ::for /r %nowPath% %%i in (*.pdb,*.vshost.*) do (del %%i)
 
 ::delete specify folder(obj,bin)
-for /r %nowPath% %%i in (obj,bin) do (IF EXIST %%i (echo RD /s /q %%i & RD /s /q %%i))
+for /r %nowPath% %%i in (obj,bin,publish) do (IF EXIST %%i (echo RD /s /q %%i & RD /s /q %%i))
 
 echo OK
 pause

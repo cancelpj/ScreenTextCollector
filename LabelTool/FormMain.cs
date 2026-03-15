@@ -6,7 +6,7 @@ using System.Drawing.Drawing2D;
 using System.IO;
 using System.Windows.Forms;
 
-namespace Configurator
+namespace LabelTool
 {
     public class FormMain : Form
     {

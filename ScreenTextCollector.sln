@@ -9,13 +9,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScreenTextCollector", "Scre
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PluginInterface", "PluginInterface\PluginInterface.csproj", "{69F0497E-08C8-4BEA-8C94-8085C03A417E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Setup", "Setup\Setup.csproj", "{DA746922-9ECE-4787-9260-715AE272EB49}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScreenTextCollector.PaddleOCR", "ScreenTextCollector.PaddleOCR\ScreenTextCollector.PaddleOCR.csproj", "{221B3711-8825-456F-B81A-A2CDE326C4FF}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ScreenTextCollector.Tests", "ScreenTextCollector.Tests\ScreenTextCollector.Tests.csproj", "{8F9A5B7E-3C4D-4E8F-9A1B-2D3E4F5A6B7C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Configurator", "Configurator\Configurator.csproj", "{0A92EC68-47AF-A960-23B3-55E0AF8E93FE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "LabelTool", "LabelTool\LabelTool.csproj", "{0A92EC68-47AF-A960-23B3-55E0AF8E93FE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -35,10 +33,6 @@ Global
 		{69F0497E-08C8-4BEA-8C94-8085C03A417E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{69F0497E-08C8-4BEA-8C94-8085C03A417E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{69F0497E-08C8-4BEA-8C94-8085C03A417E}.Release|Any CPU.Build.0 = Release|Any CPU
-		{DA746922-9ECE-4787-9260-715AE272EB49}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{DA746922-9ECE-4787-9260-715AE272EB49}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{DA746922-9ECE-4787-9260-715AE272EB49}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{DA746922-9ECE-4787-9260-715AE272EB49}.Release|Any CPU.Build.0 = Release|Any CPU
 		{221B3711-8825-456F-B81A-A2CDE326C4FF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{221B3711-8825-456F-B81A-A2CDE326C4FF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{221B3711-8825-456F-B81A-A2CDE326C4FF}.Release|Any CPU.ActiveCfg = Release|Any CPU

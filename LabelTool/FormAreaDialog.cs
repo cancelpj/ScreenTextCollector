@@ -1,7 +1,7 @@
 using System;
 using System.Windows.Forms;
 
-namespace Configurator
+namespace LabelTool
 {
     public class FormAreaDialog : Form
     {

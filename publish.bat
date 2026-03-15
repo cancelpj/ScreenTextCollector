@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 echo ========================================
-echo 一键发布 ScreenTextCollector 和 Configurator
+echo 一键发布 ScreenTextCollector 和 LabelTool
 echo ========================================
 
 :: 使用 wmic 获取干净的日期时间格式
@@ -30,10 +30,10 @@ echo.
 echo [0/2] 正在恢复 NuGet 包...
 "%MSBUILD_PATH%" ScreenTextCollector.sln /t:Restore /v:minimal
 
-:: 先发布 Configurator（它依赖 PluginInterface）
+:: 先发布 LabelTool（它依赖 PluginInterface）
 echo.
-echo [1/2] 正在发布 Configurator...
-"%MSBUILD_PATH%" Configurator\Configurator.csproj /p:Configuration=Release /p:PublishDir=%PUBLISH_DIR%\ /t:Publish /v:minimal
+echo [1/2] 正在发布 LabelTool...
+"%MSBUILD_PATH%" LabelTool\LabelTool.csproj /p:Configuration=Release /p:PublishDir=%PUBLISH_DIR%\ /t:Publish /v:minimal
 
 :: 再发布 ScreenTextCollector（它依赖 PluginInterface、OpenCvSharp、PaddleOCR）
 echo.

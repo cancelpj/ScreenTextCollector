@@ -3,7 +3,8 @@
     <OutputType>WinExe</OutputType>
     <UseWindowsForms>true</UseWindowsForms>
     <ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
-    <AssemblyName>stc</AssemblyName>
+    <!--自定义程序名-->
+    <!--<AssemblyName>stc</AssemblyName>-->
     <!-- 定义版本号格式：年.月.日.小时分钟 -->
     <Version>$([System.DateTime]::Now.ToString('yyyy.M.d.HHmm'))</Version>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
@@ -37,6 +38,11 @@
   </ItemGroup>
   <ItemGroup>
     <None Remove="app.manifest" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="README.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <!--<ItemGroup>
     <Content Include="robot_icon-icons.com_60269.ico" />
