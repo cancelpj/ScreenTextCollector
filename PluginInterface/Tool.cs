@@ -1,7 +1,6 @@
 ﻿using Newtonsoft.Json;
 using NLog;
 using NLog.Config;
-using OpenCvSharp;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -204,77 +203,6 @@ namespace PluginInterface
                 }
 
                 writer.WriteLine(string.Join(",", results.Values));
-            }
-        }
-
-        /// <summary>
-        /// 验证图像：使用模板匹配算法验证截图是否包含目标画面
-        /// </summary>
-        /// <param name="screenShotPath">截图文件路径</param>
-        /// <param name="imageVerificationAreas">验证区域列表</param>
-        /// <returns>验证通过返回 true，否则返回 false</returns>
-        public static bool VerifyImage(string screenShotPath, List<ImageVerificationArea> imageVerificationAreas)
-        {
-            try
-            {
-                // 截图文件不存在
-                if (!File.Exists(screenShotPath))
-                {
-                    Log.Warn("截图文件不存在: {0}", screenShotPath);
-                    return false;
-                }
-
-                using (Mat screenShot = Cv2.ImRead(screenShotPath))
-                {
-                    if (screenShot.Empty())
-                    {
-                        Log.Warn("无法读取截图文件: {0}", screenShotPath);
-                        return false;
-                    }
-
-                    // 逐个对比图像检测区域
-                    foreach (var area in imageVerificationAreas)
-                    {
-                        var roi = new Rect(area.TopLeftX, area.TopLeftY, area.Width, area.Height);
-
-                        var templatePath = Path.Combine("data", area.FileName);
-                        if (!File.Exists(templatePath))
-                        {
-                            Log.Warn("模板文件不存在: {0}", templatePath);
-                            return false;
-                        }
-
-                        using (Mat verificationImage = Cv2.ImRead(templatePath))
-                        {
-                            if (verificationImage.Empty())
-                            {
-                                Log.Warn("无法读取模板文件: {0}", templatePath);
-                                return false;
-                            }
-
-                            using (Mat roiImage = screenShot[roi])
-                            using (Mat matResult = new Mat())
-                            {
-                                Cv2.MatchTemplate(roiImage, verificationImage, matResult, TemplateMatchModes.CCoeffNormed);
-                                Cv2.MinMaxLoc(matResult, out var minVal, out var maxVal, out var minLoc, out var maxLoc);
-
-                                // 只要有区域图像对比不通过，就认为未监测到程序画面
-                                if (maxVal < area.MatchThreshold)
-                                {
-                                    Log.Debug("区域 {0} 匹配度 {1} 低于阈值 {2}", area.FileName, maxVal, area.MatchThreshold);
-                                    return false;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "图像验证异常");
-                return false;
             }
         }
 
