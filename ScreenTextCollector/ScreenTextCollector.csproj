@@ -22,7 +22,7 @@
   </ItemGroup>
   <PropertyGroup>
     <StartupObject />
-    <ApplicationIcon>robot_icon-icons.com_60269.ico</ApplicationIcon>
+    <ApplicationIcon>Resources\robot_icon-icons.com_60269.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <ItemGroup>
