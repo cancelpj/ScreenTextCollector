@@ -1292,9 +1292,14 @@ namespace LabelTool
 
         #region 配置保存/加载
 
+        private string GetDataDir()
+        {
+            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data");
+        }
+
         private string GetConfigPath()
         {
-            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "CaptureSettings.json");
+            return Path.Combine(GetDataDir(), "CaptureSettings.json");
         }
 
         private Image LoadIconFromResources(string resourcesDir, string fileName)
@@ -1309,7 +1314,7 @@ namespace LabelTool
 
         private string GetScreenshotPath()
         {
-            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config_screen.png");
+            return Path.Combine(GetDataDir(), "screenshot.png");
         }
 
         private void DeleteOldConfig()
@@ -1424,6 +1429,9 @@ namespace LabelTool
         {
             try
             {
+                // 确保 data 目录存在
+                Directory.CreateDirectory(GetDataDir());
+
                 var screenshotPath = GetScreenshotPath();
 
                 // 保存截图

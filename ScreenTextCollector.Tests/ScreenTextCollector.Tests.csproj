@@ -37,7 +37,7 @@
       <Link>TestData\纵拉机\%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Include="..\TestImages\拉弯机\test_screenshot.png">
+    <None Include="..\TestImages\拉弯机\data\screenshot.png">
       <Link>TestData\拉弯机\%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

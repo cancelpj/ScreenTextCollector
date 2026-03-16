@@ -21,12 +21,12 @@ namespace PluginInterface
             JsonConvert.DeserializeObject<AppSettings>(File.ReadAllText("appsettings.json"));
 
         /// <summary>
-        /// 屏幕采集配置（从 CaptureSettings.json 加载）
+        /// 屏幕采集配置（从 data/CaptureSettings.json 加载）
         /// 由 LabelTool 生成和维护
         /// </summary>
         public static readonly CaptureSettings CaptureSettings =
-            File.Exists("CaptureSettings.json")
-                ? JsonConvert.DeserializeObject<CaptureSettings>(File.ReadAllText("CaptureSettings.json"))
+            File.Exists(Path.Combine("data", "CaptureSettings.json"))
+                ? JsonConvert.DeserializeObject<CaptureSettings>(File.ReadAllText(Path.Combine("data", "CaptureSettings.json")))
                 : new CaptureSettings();
 
         public static readonly Logger Log = LogManager.GetCurrentClassLogger();
