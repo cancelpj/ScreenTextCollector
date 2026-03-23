@@ -441,6 +441,38 @@ namespace LabelTool
 
         private void BtnCapture_Click(object sender, EventArgs e)
         {
+            var configPath = GetConfigPath();
+
+            // 检查是否存在旧配置文件
+            if (File.Exists(configPath))
+            {
+                // 弹窗警告
+                var result = MessageBox.Show(
+                    "重新截屏将删除现有的所有配置和图片文件，是否继续？",
+                    "确认重新截屏",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning);
+
+                if (result != DialogResult.Yes)
+                {
+                    return; // 用户取消
+                }
+
+                // 清理旧配置
+                DeleteOldConfig();
+
+                // 清空内存中的区域列表
+                _verificationAreas.Clear();
+                _collectionAreas.Clear();
+                _selectedVerificationIndex = -1;
+                _selectedCollectionIndex = -1;
+
+                // 刷新列表显示
+                RefreshVerificationList();
+                RefreshCollectionList();
+            }
+
+            // 开始新的截屏流程
             SelectScreenAndCapture(sender, e);
         }
 

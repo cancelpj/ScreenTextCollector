@@ -158,7 +158,7 @@ namespace LabelTool
         private void BtnCancel_Click(object sender, EventArgs e)
         {
             // 取消时关闭整个程序
-            Application.Exit();
+            //Application.Exit();
         }
 
         private void FormScreenSelect_KeyDown(object sender, KeyEventArgs e)
