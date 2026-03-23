@@ -11,7 +11,7 @@ namespace ScreenTextCollector
     {
         #region MQTT推送服务
 
-        private static void StartMqttPush(MqttBrokerConfig mqttBrokerConfig)
+        private static void StartMqttPush(MqttBrokerConfig mqttBrokerConfig, CancellationToken cancellationToken)
         {
             if (!string.IsNullOrEmpty(mqttBrokerConfig.Ip) && !string.IsNullOrEmpty(mqttBrokerConfig.Topic))
             {
@@ -36,7 +36,7 @@ namespace ScreenTextCollector
 
                     #endregion MQTT 连接配置
 
-                    while (_isRunning)
+                    while (!cancellationToken.IsCancellationRequested)
                     {
                         string payloadJson;
                         var ret = ScreenTextCollect();
@@ -63,13 +63,28 @@ namespace ScreenTextCollector
                             payloadJson = ret.Message;
                         }
 
-                        MqttConnect(_mqttClient, mqttBrokerConfig.Ip, mqttBrokerConfig.Port);
+                        MqttConnect(_mqttClient, mqttBrokerConfig.Ip, mqttBrokerConfig.Port, cancellationToken);
                         //_mqttClient.Connect(mqttBrokerConfig.Ip, mqttBrokerConfig.Port, 30, true);
                         _mqttClient.Publish(mqttBrokerConfig.Topic, payloadJson);
                         Tool.Log.Info($"{DateTime.Now} 发布 MQTT 消息: {payloadJson}\n");
 
-                        Thread.Sleep(mqttBrokerConfig.CaptureFrequency * 1000);
+                        // 使用 WaitOne 实现可中断的等待
+                        // 每秒检查一次取消信号，允许快速响应退出请求
+                        int sleepIntervalMs = mqttBrokerConfig.CaptureFrequency * 1000;
+                        int checkIntervalMs = 1000;
+                        int elapsedMs = 0;
+
+                        while (elapsedMs < sleepIntervalMs && !cancellationToken.IsCancellationRequested)
+                        {
+                            Thread.Sleep(checkIntervalMs);
+                            elapsedMs += checkIntervalMs;
+                        }
                     }
+                }
+                catch (OperationCanceledException)
+                {
+                    // 线程被正常取消，忽略异常
+                    Tool.Log.Info("MQTT 推送线程已收到取消信号");
                 }
                 catch (Exception ex)
                 {
@@ -89,13 +104,13 @@ namespace ScreenTextCollector
             }
         }
 
-        private static void MqttConnect(MqttClient mqttClient, string mqttServerIp, int mqttServerPort)
+        private static void MqttConnect(MqttClient mqttClient, string mqttServerIp, int mqttServerPort, CancellationToken cancellationToken)
         {
             mqttClient.Connect(mqttServerIp, mqttServerPort);
-            while (!mqttClient.IsConnected && _isRunning)
+            while (!mqttClient.IsConnected && !cancellationToken.IsCancellationRequested)
             {
                 Thread.Sleep(10000);
-                if (_isRunning) // 检查是否还在运行
+                if (!cancellationToken.IsCancellationRequested) // 检查是否还在运行
                 {
                     Tool.Log.Info("尝试重连MQTT ...");
                     mqttClient.Connect(mqttServerIp, mqttServerPort);

@@ -20,6 +20,7 @@ namespace ScreenTextCollector
         private static MqttClient _mqttClient = null; // 保持全局引用便于清理
         private static HttpListener _listener = null; // 保持全局引用便于清理
         private static Mutex _mutex = null;
+        private static CancellationTokenSource _cancellationTokenSource = null; // 用于优雅停止线程
 
         static void Main(string[] args)
         {
@@ -71,8 +72,15 @@ namespace ScreenTextCollector
                 var mqttBrokerConfig = Tool.Settings.MqttBroker;
                 if (mqttBrokerConfig.EnableMqttPush)
                 {
+                    // 创建取消令牌，用于优雅停止线程
+                    _cancellationTokenSource = new CancellationTokenSource();
+
                     //用一个独立线程定时检查进程并推送 MQTT
-                    _mqttPushThread = new Thread(() => StartMqttPush(mqttBrokerConfig)) { IsBackground = true };
+                    _mqttPushThread = new Thread(() => StartMqttPush(mqttBrokerConfig, _cancellationTokenSource.Token))
+                    {
+                        IsBackground = true,
+                        Name = "MqttPushThread"
+                    };
                     _mqttPushThread.Start();
                 }
 
@@ -115,7 +123,6 @@ namespace ScreenTextCollector
                 try
                 {
                     _mqttClient?.Disconnect();
-                    _mqttPushThread.Abort();
                 }
                 catch
                 {
@@ -124,6 +131,29 @@ namespace ScreenTextCollector
                 {
                     _mqttClient?.Dispose();
                     _mqttClient = null;
+                }
+            }
+
+            // 取消线程执行信号
+            if (_cancellationTokenSource != null)
+            {
+                try
+                {
+                    _cancellationTokenSource.Cancel();
+                    // 等待线程自然退出（最多等待5秒）
+                    if (_mqttPushThread != null && _mqttPushThread.IsAlive)
+                    {
+                        _mqttPushThread.Join(5000);
+                    }
+                }
+                catch
+                {
+                }
+                finally
+                {
+                    _cancellationTokenSource.Dispose();
+                    _cancellationTokenSource = null;
+                    _mqttPushThread = null;
                 }
             }
 
