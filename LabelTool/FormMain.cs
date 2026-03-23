@@ -206,9 +206,9 @@ namespace LabelTool
                 }
                 else
                 {
-                    // 用户取消，使用默认主屏幕
-                    _screenNumber = 0;
-                    CaptureScreen(_screenNumber);
+                    // 用户取消，直接返回主界面，不截屏
+                    _statusLabel.Text = "已取消截屏";
+                    return;
                 }
             }
         }

@@ -163,10 +163,11 @@ namespace LabelTool
 
         private void FormScreenSelect_KeyDown(object sender, KeyEventArgs e)
         {
-            // ESC键取消，关闭整个程序
+            // ESC键取消，只关闭对话框，不退出程序
             if (e.KeyCode == Keys.Escape)
             {
-                Application.Exit();
+                this.DialogResult = DialogResult.Cancel;
+                this.Close();
             }
         }
     }
