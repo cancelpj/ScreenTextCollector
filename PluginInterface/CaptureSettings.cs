@@ -22,5 +22,10 @@ namespace PluginInterface
         /// 图像采集区域列表
         /// </summary>
         public List<ImageCollectionArea> CollectionAreas { get; set; }
+
+        /// <summary>
+        /// OCR 引擎类型：OpenCvSharp 或 PaddleOCR
+        /// </summary>
+        public string OcrEngine { get; set; } = "PaddleOCR";
     }
 }

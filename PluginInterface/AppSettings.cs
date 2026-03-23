@@ -26,9 +26,5 @@ namespace PluginInterface
         /// </summary>
         public MqttBrokerConfig MqttBroker { get; set; }
 
-        /// <summary>
-        /// OCR 引擎类型：OpenCvSharp 或 PaddleOCR
-        /// </summary>
-        public string OcrEngine { get; set; } = "OpenCvSharp";
     }
 }

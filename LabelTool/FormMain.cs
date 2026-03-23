@@ -1416,7 +1416,7 @@ namespace LabelTool
             try
             {
                 var json = File.ReadAllText(configPath);
-                var config = Newtonsoft.Json.JsonConvert.DeserializeObject<ConfigData>(json);
+                var config = Newtonsoft.Json.JsonConvert.DeserializeObject<CaptureSettings>(json);
                 if (config != null)
                 {
                     _verificationAreas = config.VerificationAreas ?? new List<ImageVerificationArea>();
@@ -1469,7 +1469,7 @@ namespace LabelTool
                 // 保存截图
                 _screenshot?.Save(screenshotPath, System.Drawing.Imaging.ImageFormat.Png);
 
-                var config = new ConfigData
+                var config = new CaptureSettings
                 {
                     VerificationAreas = _verificationAreas,
                     CollectionAreas = _collectionAreas,
@@ -1707,13 +1707,4 @@ namespace LabelTool
         }
     }
 
-    /// <summary>
-    /// 配置数据结构
-    /// </summary>
-    public class ConfigData
-    {
-        public List<ImageVerificationArea> VerificationAreas { get; set; }
-        public List<ImageCollectionArea> CollectionAreas { get; set; }
-        public int ScreenNumber { get; set; } = 0;
-    }
 }

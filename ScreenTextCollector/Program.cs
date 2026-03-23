@@ -166,7 +166,7 @@ namespace ScreenTextCollector
         /// </summary>
         private static IOcrService CreateOcrService()
         {
-            var engine = Tool.Settings.OcrEngine?.ToLower() ?? "opencvsharp";
+            var engine = Tool.CaptureSettings.OcrEngine?.ToLower() ?? "paddleocr";
             switch (engine)
             {
                 case "paddleocr":

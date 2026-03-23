@@ -20,7 +20,6 @@ namespace ScreenTextCollector.Tests
             Assert.False(settings.CsvRecord);
             Assert.Null(settings.Http);
             Assert.Null(settings.MqttBroker);
-            Assert.Equal("OpenCvSharp", settings.OcrEngine);
         }
 
         [Fact]
@@ -31,7 +30,6 @@ namespace ScreenTextCollector.Tests
             {
                 DeviceName = "测试设备",
                 CsvRecord = true,
-                OcrEngine = "PaddleOCR",
                 Http = new HttpConfig { EnableHttp = true, Ip = "127.0.0.1", Port = 8080 },
                 MqttBroker = new MqttBrokerConfig { EnableMqttPush = true, Ip = "localhost", Port = 1883 }
             };
@@ -39,7 +37,6 @@ namespace ScreenTextCollector.Tests
             // Assert
             Assert.Equal("测试设备", settings.DeviceName);
             Assert.True(settings.CsvRecord);
-            Assert.Equal("PaddleOCR", settings.OcrEngine);
             Assert.NotNull(settings.Http);
             Assert.NotNull(settings.MqttBroker);
         }
@@ -54,6 +51,7 @@ namespace ScreenTextCollector.Tests
             Assert.Equal(0, settings.ScreenNumber);
             Assert.Null(settings.VerificationAreas);
             Assert.Null(settings.CollectionAreas);
+            Assert.Equal("PaddleOCR", settings.OcrEngine);
         }
 
         [Fact]
@@ -64,13 +62,15 @@ namespace ScreenTextCollector.Tests
             {
                 ScreenNumber = 1,
                 VerificationAreas = new List<ImageVerificationArea>(),
-                CollectionAreas = new List<ImageCollectionArea>()
+                CollectionAreas = new List<ImageCollectionArea>(),
+                OcrEngine = "PaddleOCR"
             };
 
             // Assert
             Assert.Equal(1, settings.ScreenNumber);
             Assert.NotNull(settings.VerificationAreas);
             Assert.NotNull(settings.CollectionAreas);
+            Assert.Equal("PaddleOCR", settings.OcrEngine);
         }
 
         [Fact]
