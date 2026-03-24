@@ -89,7 +89,8 @@
 
 ```
 ScreenTextCollector/
-├── ScreenTextCollector/          # 主程序（WinForms应用）
+├── LabelTool/                    # 图形化标注工具
+├── ScreenTextCollector/          # 采集程序（WinForms应用）
 │   ├── Program.cs               # 入口点，单实例运行检查
 │   ├── Form1.cs                 # 主窗体，日志UI展示
 │   ├── ServiceMqttPush.cs       # MQTT推送服务
@@ -101,7 +102,6 @@ ScreenTextCollector/
 │   ├── Settings.cs              # 配置模型
 │   ├── IOcrService.cs           # OCR服务接口
 │   └── NLogGuiTarget.cs         # NLog自定义目标
-├── LabelTool/                    # 图形化标注工具
 ├── ScreenTextCollector.OpenCvSharp/  # OpenCvSharp OCR实现（可选）
 ├── ScreenTextCollector.PaddleOCR/     # PaddleOCR OCR实现
 └── ScreenTextCollector.Tests/    # 单元测试项目
@@ -114,16 +114,21 @@ ScreenTextCollector/
 msbuild ScreenTextCollector.sln /p:Configuration=Release
 
 # 或使用 dotnet build
-dotnet build ScreenTextCollector/ScreenTextCollector.csproj -c Release
-
-# 使用一键发布脚本（推荐）
-publish.bat
+dotnet build LabelTool/LabelTool.csproj -c Release
 ```
 
 ### 发布说明
 
-运行 `publish.bat` 会将两个可执行文件发布到 `publish` 目录：
-- `ScreenTextCollector.exe` - 主程序
+```bash
+# 使用 Visual Studio 中 LabelTool 项目的发布功能（同时支持图形化和命令行操作）
+dotnet publish LabelTool/LabelTool.csproj  -p:PublishProfile=FolderProfile.pubxml
+
+# 或使用一键发布脚本
+publish.bat
+```
+
+会将所需文件完整发布到 `root/publish_yyyy.MM.dd.hhmmss` 目录下：
 - `LabelTool.exe` - 标注工具
+- `ScreenTextCollector.exe` - 采集程序
 
 发布前需确保已安装 Visual Studio 2019 或更高版本，并配置好 MSBuild 路径。
