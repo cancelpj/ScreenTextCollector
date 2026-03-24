@@ -13,7 +13,7 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\PluginInterface\PluginInterface.csproj" />
+    <ProjectReference Include="..\ScreenTextCollector\ScreenTextCollector.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\*.png">

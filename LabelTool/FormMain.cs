@@ -70,6 +70,8 @@ namespace LabelTool
         private ToolStripButton _btnSave;
         private ToolStripButton _btnOpenConfig;
         private ToolStripButton _btnAbout;
+        private ToolStripLabel _ocrEngineLabel;
+        private ToolStripComboBox _ocrEngineComboBox;
 
         public FormMain()
         {
@@ -269,6 +271,19 @@ namespace LabelTool
             this._thresholdComboBox.SelectedIndex = 1; // 默认0.8
             this._thresholdComboBox.SelectedIndexChanged += ThresholdComboBox_SelectedIndexChanged;
 
+            // OCR引擎下拉框
+            var toolStripSeparator2 = new ToolStripSeparator();
+            this._ocrEngineLabel = new ToolStripLabel();
+            this._ocrEngineLabel.Text = "OCR引擎:";
+            this._ocrEngineComboBox = new ToolStripComboBox();
+            this._ocrEngineComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            this._ocrEngineComboBox.Items.AddRange(new object[] { "PaddleOCR", "OpenCvSharp" });
+            this._ocrEngineComboBox.SelectedIndex = 0; // 默认PaddleOCR
+            this._ocrEngineComboBox.SelectedIndexChanged += OcrEngineComboBox_SelectedIndexChanged;
+            this._toolStrip.Items.Add(toolStripSeparator2);
+            this._toolStrip.Items.Add(this._ocrEngineLabel);
+            this._toolStrip.Items.Add(this._ocrEngineComboBox);
+
             // 垂直SplitContainer（左侧图片，右侧列表）
             this._verticalSplit = new SplitContainer
             {
@@ -355,6 +370,7 @@ namespace LabelTool
             this._collectionListView.Columns.Add("名称", 80);
             this._collectionListView.Columns.Add("位置", 150);
             this._collectionListView.Columns.Add("", 30);
+            this._collectionListView.Columns.Add("识别结果", 200);
             this._collectionListView.SelectedIndexChanged += CollectionListView_SelectedIndexChanged;
             this._collectionListView.MouseClick += CollectionListView_MouseClick;
             this._collectionListView.MouseDoubleClick += CollectionListView_MouseDoubleClick;
@@ -508,6 +524,11 @@ namespace LabelTool
             }
         }
 
+        private void OcrEngineComboBox_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            RefreshCollectionListOcrResults();
+        }
+
         #endregion
 
         #region 截屏功能
@@ -566,6 +587,7 @@ namespace LabelTool
 
                 _imagePanel.Invalidate();
                 _statusLabel.Text = $"截屏完成: {_screenshot.Width}x{_screenshot.Height}";
+                RefreshCollectionListOcrResults();
             }
             catch (Exception ex)
             {
@@ -1249,9 +1271,11 @@ namespace LabelTool
                 var item = new ListViewItem(area.Name);
                 item.SubItems.Add($"({area.TopLeftX}, {area.TopLeftY}, {area.Width}x{area.Height})");
                 item.SubItems.Add("×");
+                item.SubItems.Add(""); // OCR识别结果列
                 item.Tag = i;
                 _collectionListView.Items.Add(item);
             }
+            RefreshCollectionListOcrResults();
         }
 
         private void VerificationListView_SelectedIndexChanged(object sender, EventArgs e)
@@ -1397,6 +1421,7 @@ namespace LabelTool
                     }
                     _imagePanel.Invalidate();
                     _statusLabel.Text = $"截图已加载: {_screenshot.Width}x{_screenshot.Height}";
+                    RefreshCollectionListOcrResults();
                 }
             }
             catch (Exception ex)
@@ -1693,6 +1718,65 @@ namespace LabelTool
             }
 
             return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        #endregion
+
+        #region OCR功能
+
+        /// <summary>
+        /// 根据选中的索引创建对应的 OCR 服务实例
+        /// </summary>
+        /// <param name="engineIndex">0=PaddleOCR, 1=OpenCvSharp</param>
+        private IOcrService CreateOcrService(int engineIndex)
+        {
+            return engineIndex == 0
+                ? (IOcrService)new ScreenTextCollector.PaddleOCR.OcrService()
+                : (IOcrService)new ScreenTextCollector.OpenCvSharp.OcrService();
+        }
+
+        /// <summary>
+        /// 刷新采集列表中所有区域的 OCR 识别结果
+        /// </summary>
+        private void RefreshCollectionListOcrResults()
+        {
+            if (_screenshot == null || _collectionAreas.Count == 0) return;
+
+            try
+            {
+                // 保存临时截图用于 OCR
+                var tempPath = Path.Combine(Path.GetTempPath(), "labeltool_ocr_temp.png");
+                _screenshot.Save(tempPath, System.Drawing.Imaging.ImageFormat.Png);
+
+                // 根据选中的引擎创建对应的 OcrService
+                IOcrService ocrService = CreateOcrService(_ocrEngineComboBox.SelectedIndex);
+
+                // 对每个采集区域执行 OCR
+                for (int i = 0; i < _collectionAreas.Count; i++)
+                {
+                    var area = _collectionAreas[i];
+                    string result = ocrService.PerformOcr(tempPath, area);
+
+                    // 更新 ListView OCR结果列（第4列，索引3）
+                    if (i < _collectionListView.Items.Count)
+                    {
+                        _collectionListView.Items[i].SubItems[3].Text = result;
+                    }
+                }
+
+                // 清理临时文件
+                try { File.Delete(tempPath); } catch { }
+
+                // 释放 OCR 服务资源
+                if (ocrService is IDisposable disposable)
+                {
+                    disposable.Dispose();
+                }
+            }
+            catch (Exception ex)
+            {
+                _statusLabel.Text = $"OCR识别失败: {ex.Message}";
+            }
         }
 
         #endregion
