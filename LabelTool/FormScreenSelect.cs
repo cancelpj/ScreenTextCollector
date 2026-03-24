@@ -78,7 +78,7 @@ namespace LabelTool
             //
             this.BackColor = System.Drawing.Color.White;
             this.CancelButton = this._btnCancel;
-            this.ClientSize = new System.Drawing.Size(384, 311);
+            this.ClientSize = new System.Drawing.Size(420, 340);
             this.Controls.Add(this._lblTitle);
             this.Controls.Add(this._screenListBox);
             this.Controls.Add(this._btnOk);
