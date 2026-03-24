@@ -27,12 +27,12 @@ if not exist "%PUBLISH_DIR%" mkdir "%PUBLISH_DIR%"
 
 :: 先恢复 NuGet 包
 echo.
-echo [0/2] 正在恢复 NuGet 包...
+echo [1/2] 正在恢复 NuGet 包...
 "%MSBUILD_PATH%" ScreenTextCollector.sln /t:Restore /v:minimal
 
 :: 发布 LabelTool（它依赖 PluginInterface）
 echo.
-echo 正在发布 LabelTool...
+echo [2/2] 正在发布 LabelTool...
 "%MSBUILD_PATH%" LabelTool\LabelTool.csproj /p:Configuration=Release /p:PublishDir=%PUBLISH_DIR%\ /t:Publish /v:minimal
 
 echo.
@@ -43,4 +43,5 @@ echo ========================================
 :: 显示发布结果
 dir /b "%PUBLISH_DIR%\*.exe" 2>nul
 
+echo.
 pause
