@@ -72,6 +72,7 @@ namespace LabelTool
         private ToolStripButton _btnAbout;
         private ToolStripLabel _ocrEngineLabel;
         private ToolStripComboBox _ocrEngineComboBox;
+        private ToolStripButton _btnOcrTest;
 
         // 手柄偏移因子（相对于 rect.X/Y 的比例）：左上、上、右上、右、右下、下、左下、左
         // 每个元素的 (X,Y) 表示 rect.X + rect.Width * X, rect.Y + rect.Height * Y
@@ -190,7 +191,7 @@ namespace LabelTool
         {
             // 初始化 ToolTip
             _toolTip = new ToolTip();
-            _toolTip.SetToolTip(_toolStrip, "工具栏：重新截屏 | 保存配置 | 用记事本打开配置");
+            _toolTip.SetToolTip(_toolStrip, "工具栏：重新截屏 | 保存配置 | 用记事本打开配置 | OCR测试");
 
             // 检查是否存在旧配置文件
             var configPath = GetConfigPath();
@@ -291,6 +292,7 @@ namespace LabelTool
             var screenshotIcon = LoadIconFromResources(resourcesDir, "Screenshot.png");
             var saveIcon = LoadIconFromResources(resourcesDir, "Save.png");
             var openIcon = LoadIconFromResources(resourcesDir, "Open.png");
+            var ocrIcon = LoadIconFromResources(resourcesDir, "ocr.png");
             var aboutIcon = SystemIcons.Information.ToBitmap();
 
             // ToolStrip
@@ -334,6 +336,11 @@ namespace LabelTool
             this._toolStrip.Items.Add(toolStripSeparator2);
             this._toolStrip.Items.Add(this._ocrEngineLabel);
             this._toolStrip.Items.Add(this._ocrEngineComboBox);
+            // OCR测试按钮
+            var toolStripSeparator3 = new ToolStripSeparator();
+            this._btnOcrTest = new ToolStripButton("OCR测试", ocrIcon, BtnOcrTest_Click);
+            this._toolStrip.Items.Add(toolStripSeparator3);
+            this._toolStrip.Items.Add(this._btnOcrTest);
 
             // 垂直SplitContainer（左侧图片，右侧列表）
             this._verticalSplit = new SplitContainer
@@ -579,7 +586,25 @@ namespace LabelTool
 
         private void OcrEngineComboBox_SelectedIndexChanged(object sender, EventArgs e)
         {
-            RefreshCollectionListOcrResults();
+            // 切换引擎不再自动刷新OCR结果，由用户手动点击"OCR测试"按钮
+        }
+
+        private void BtnOcrTest_Click(object sender, EventArgs e)
+        {
+            if (_screenshot == null)
+            {
+                MessageBox.Show("请先进行截屏。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            if (_collectionAreas.Count == 0)
+            {
+                MessageBox.Show("请先添加采集区域。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            _btnOcrTest.Enabled = false;
+            _statusLabel.Text = "正在识别...";
+            if (RefreshCollectionListOcrResults()) _statusLabel.Text = "识别完成";
+            _btnOcrTest.Enabled = true;
         }
 
         #endregion
@@ -640,7 +665,6 @@ namespace LabelTool
 
                 _imagePanel.Invalidate();
                 _statusLabel.Text = $"截屏完成: {_screenshot.Width}x{_screenshot.Height}";
-                RefreshCollectionListOcrResults();
             }
             catch (Exception ex)
             {
@@ -1276,7 +1300,7 @@ namespace LabelTool
                     (int)(area.Height * scaleY));
 
                 var frontColor = i == _selectedVerificationIndex ? Color.Cyan : Color.LightSkyBlue;
-                var backColor =  Color.FromArgb(200, Color.Black);
+                var backColor = Color.FromArgb(200, Color.Black);
                 DrawArea(e.Graphics, rect, frontColor, backColor, "检测: " + Path.GetFileNameWithoutExtension(area.FileName), i == _selectedVerificationIndex);
             }
 
@@ -1443,7 +1467,6 @@ namespace LabelTool
                 item.Tag = i;
                 _collectionListView.Items.Add(item);
             }
-            RefreshCollectionListOcrResults();
         }
 
         private void VerificationListView_SelectedIndexChanged(object sender, EventArgs e)
@@ -1590,7 +1613,6 @@ namespace LabelTool
                     }
                     _imagePanel.Invalidate();
                     _statusLabel.Text = $"截图已加载: {_screenshot.Width}x{_screenshot.Height}";
-                    RefreshCollectionListOcrResults();
                 }
             }
             catch (Exception ex)
@@ -1907,9 +1929,13 @@ namespace LabelTool
         /// <summary>
         /// 刷新采集列表中所有区域的 OCR 识别结果
         /// </summary>
-        private void RefreshCollectionListOcrResults()
+        private bool RefreshCollectionListOcrResults()
         {
-            if (_screenshot == null || _collectionAreas.Count == 0) return;
+            if (_screenshot == null || _collectionAreas.Count == 0)
+            {
+                _statusLabel.Text = "没有截图或采集区域，无法执行 OCR 识别";
+                return false;
+            }
 
             try
             {
@@ -1945,7 +1971,10 @@ namespace LabelTool
             catch (Exception ex)
             {
                 _statusLabel.Text = $"OCR识别失败: {ex.Message}";
+                return false;
             }
+
+            return true;
         }
 
         #endregion
