@@ -30,6 +30,11 @@ namespace LabelTool
         public int AreaHeight { get; private set; }
 
         /// <summary>
+        /// 名称验证回调。传入当前输入的名称，返回错误提示文本；返回 null 表示验证通过。
+        /// </summary>
+        public Func<string, string> ValidateName { get; set; }
+
+        /// <summary>
         /// 新建区域
         /// </summary>
         public FormAreaDialog(bool isVerificationMode, float defaultThreshold) :
@@ -192,7 +197,7 @@ namespace LabelTool
             this._thresholdNumeric.Value = new decimal(new int[] { 80, 0, 0, 131072 });
 
             // 按钮
-            this._btnOk.DialogResult = System.Windows.Forms.DialogResult.OK;
+            this._btnOk.DialogResult = System.Windows.Forms.DialogResult.None;
             this._btnOk.Location = new System.Drawing.Point(startX + 80, row5Y);
             this._btnOk.Name = "_btnOk";
             this._btnOk.Size = new System.Drawing.Size(75, 25);
@@ -251,10 +256,26 @@ namespace LabelTool
             if (string.IsNullOrWhiteSpace(_nameTextBox.Text))
             {
                 MessageBox.Show("请输入区域名称", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                _nameTextBox.Focus();
                 return;
             }
 
-            AreaName = _nameTextBox.Text.Trim();
+            string trimmedName = _nameTextBox.Text.Trim();
+
+            // 调用名称验证回调
+            if (ValidateName != null)
+            {
+                string errorMsg = ValidateName(trimmedName);
+                if (errorMsg != null)
+                {
+                    MessageBox.Show(errorMsg, "名称重复", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    _nameTextBox.Focus();
+                    _nameTextBox.SelectAll();
+                    return;
+                }
+            }
+
+            AreaName = trimmedName;
             MatchThreshold = (float)_thresholdNumeric.Value;
             AreaX = (int)_numericX.Value;
             AreaY = (int)_numericY.Value;

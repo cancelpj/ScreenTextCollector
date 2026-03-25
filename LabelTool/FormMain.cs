@@ -73,6 +73,57 @@ namespace LabelTool
         private ToolStripLabel _ocrEngineLabel;
         private ToolStripComboBox _ocrEngineComboBox;
 
+        // 手柄偏移因子（相对于 rect.X/Y 的比例）：左上、上、右上、右、右下、下、左下、左
+        // 每个元素的 (X,Y) 表示 rect.X + rect.Width * X, rect.Y + rect.Height * Y
+        private static readonly float[] _handleFX = { 0f, 0.5f, 1f, 1f, 1f, 0.5f, 0f, 0f };
+        private static readonly float[] _handleFY = { 0f, 0f, 0f, 0.5f, 1f, 1f, 1f, 0.5f };
+        private static readonly float[] _anchorFX = { 0f, 0.5f, 0f, 0f, 0f, 0.5f, 0f, 0f };
+        private static readonly float[] _anchorFY = { 0f, 0f, 0f, 0.5f, 0f, 0f, 0f, 0.5f };
+
+        /// <summary>
+        /// 根据基准矩形和手柄大小，计算 8 个手柄的 Rectangle（左上→顺时针→左）
+        /// </summary>
+        private static Rectangle[] GetHandleRects(Rectangle rect, int handleSize)
+        {
+            var rects = new Rectangle[8];
+            for (int i = 0; i < 8; i++)
+            {
+                int cx = (int)(rect.X + rect.Width * _handleFX[i]);
+                int cy = (int)(rect.Y + rect.Height * _handleFY[i]);
+                rects[i] = new Rectangle(cx - handleSize / 2, cy - handleSize / 2, handleSize, handleSize);
+            }
+            return rects;
+        }
+
+        /// <summary>
+        /// 检查采集区域名称是否与已有区域重复（排除自身）
+        /// </summary>
+        private bool IsCollectionNameDuplicate(string name, int excludeIndex = -1)
+        {
+            for (int i = 0; i < _collectionAreas.Count; i++)
+            {
+                if (i == excludeIndex) continue;
+                if (string.Equals(_collectionAreas[i].Name, name, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 检查检测区域名称是否与已有区域重复（排除自身）
+        /// </summary>
+        private bool IsVerificationNameDuplicate(string name, int excludeIndex = -1)
+        {
+            for (int i = 0; i < _verificationAreas.Count; i++)
+            {
+                if (i == excludeIndex) continue;
+                if (string.Equals(Path.GetFileNameWithoutExtension(_verificationAreas[i].FileName),
+                    name, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
+        }
+
         public FormMain()
         {
             InitializeComponent();
@@ -305,6 +356,8 @@ namespace LabelTool
             this._imagePanel.MouseUp += ImagePanel_MouseUp;
             this._imagePanel.MouseClick += ImagePanel_MouseClick;
             this._imagePanel.MouseDoubleClick += ImagePanel_MouseDoubleClick;
+            this._imagePanel.MouseEnter += ImagePanel_MouseEnter;
+            this._imagePanel.MouseLeave += ImagePanel_MouseLeave;
             this._imagePanel.KeyDown += ImagePanel_KeyDown;
             this._imagePanel.TabIndex = 0;
             this._imagePanel.TabStop = true;
@@ -656,6 +709,8 @@ namespace LabelTool
             {
                 _dragStart = e.Location;
                 _isDragging = true;
+                // 拖拽时设置移动光标
+                _imagePanel.Cursor = _isResizingArea ? Cursors.SizeAll : Cursors.SizeAll;
             }
             else
             {
@@ -723,6 +778,24 @@ namespace LabelTool
             }
         }
 
+        /// <summary>
+        /// 鼠标进入区域时检测并更新光标
+        /// </summary>
+        private void ImagePanel_MouseEnter(object sender, EventArgs e)
+        {
+            if (_screenshot == null) return;
+            var pos = _imagePanel.PointToClient(Cursor.Position);
+            UpdateCursorForResizeHandles(pos);
+        }
+
+        /// <summary>
+        /// 鼠标离开区域时恢复默认光标
+        /// </summary>
+        private void ImagePanel_MouseLeave(object sender, EventArgs e)
+        {
+            _imagePanel.Cursor = Cursors.Default;
+        }
+
         private void ImagePanel_MouseUp(object sender, MouseEventArgs e)
         {
             if (_screenshot == null || !_isDragging) return;
@@ -735,6 +808,8 @@ namespace LabelTool
                 _isDragging = false;
                 _resizeHandle = -1;
                 _imagePanel.Invalidate();
+                // 恢复默认光标
+                UpdateCursorForResizeHandles(e.Location);
                 return;
             }
 
@@ -742,8 +817,6 @@ namespace LabelTool
             _currentRect = GetRectangle(_dragStart, _dragEnd);
 
             _isDragging = false;
-            _dragEnd = e.Location;
-            _currentRect = GetRectangle(_dragStart, _dragEnd);
 
             // 确保矩形有效
             if (_currentRect.Width > 10 && _currentRect.Height > 10)
@@ -779,6 +852,7 @@ namespace LabelTool
                     _selectedCollectionIndex = -1;
                     SelectVerificationItem(i);
                     _imagePanel.Invalidate();
+                    UpdateCursorForResizeHandles(clickPoint);
                     return;
                 }
             }
@@ -794,6 +868,7 @@ namespace LabelTool
                     _selectedVerificationIndex = -1;
                     SelectCollectionItem(i);
                     _imagePanel.Invalidate();
+                    UpdateCursorForResizeHandles(clickPoint);
                     return;
                 }
             }
@@ -804,6 +879,7 @@ namespace LabelTool
             _verificationListView.SelectedItems.Clear();
             _collectionListView.SelectedItems.Clear();
             _imagePanel.Invalidate();
+            UpdateCursorForResizeHandles(clickPoint);
         }
 
         private Rectangle GetRectangle(Point start, Point end)
@@ -836,30 +912,13 @@ namespace LabelTool
                 (int)(area.Height * scaleY));
         }
 
-        /// <summary>
-        /// 获取缩放手柄编号（-1表示不在手柄范围内）
-        /// 手柄编号：0-左上，1-上，2-右上，3-右，4-右下，5-下，6-左下，7-左
-        /// </summary>
         private int GetResizeHandle(Rectangle rect, Point point)
         {
-            int handleSize = 8;
-            // 八个方向的检测区域
-            var handles = new Dictionary<int, Rectangle>
+            var rects = GetHandleRects(rect, 8);
+            for (int i = 0; i < rects.Length; i++)
             {
-                { 0, new Rectangle(rect.X - handleSize/2, rect.Y - handleSize/2, handleSize, handleSize) }, // 左上
-                { 1, new Rectangle(rect.X + rect.Width/2 - handleSize/2, rect.Y - handleSize/2, handleSize, handleSize) }, // 上
-                { 2, new Rectangle(rect.X + rect.Width - handleSize/2, rect.Y - handleSize/2, handleSize, handleSize) }, // 右上
-                { 3, new Rectangle(rect.X + rect.Width - handleSize/2, rect.Y + rect.Height/2 - handleSize/2, handleSize, handleSize) }, // 右
-                { 4, new Rectangle(rect.X + rect.Width - handleSize/2, rect.Y + rect.Height - handleSize/2, handleSize, handleSize) }, // 右下
-                { 5, new Rectangle(rect.X + rect.Width/2 - handleSize/2, rect.Y + rect.Height - handleSize/2, handleSize, handleSize) }, // 下
-                { 6, new Rectangle(rect.X - handleSize/2, rect.Y + rect.Height - handleSize/2, handleSize, handleSize) }, // 左下
-                { 7, new Rectangle(rect.X - handleSize/2, rect.Y + rect.Height/2 - handleSize/2, handleSize, handleSize) }, // 左
-            };
-
-            foreach (var kvp in handles)
-            {
-                if (kvp.Value.Contains(point))
-                    return kvp.Key;
+                if (rects[i].Contains(point))
+                    return i;
             }
             return -1;
         }
@@ -1028,7 +1087,13 @@ namespace LabelTool
             if (index < 0 || index >= _verificationAreas.Count) return;
 
             var area = _verificationAreas[index];
-            var dialog = new FormAreaDialog(true, area.MatchThreshold, area.FileName, area.TopLeftX, area.TopLeftY, area.Width, area.Height);
+            var dialog = new FormAreaDialog(true, area.MatchThreshold, Path.GetFileNameWithoutExtension(area.FileName), area.TopLeftX, area.TopLeftY, area.Width, area.Height);
+            dialog.ValidateName = name =>
+            {
+                if (IsVerificationNameDuplicate(name, index))
+                    return $"检测区域名称 \"{name}\" 已存在，请使用其他名称。";
+                return null;
+            };
             if (dialog.ShowDialog() == DialogResult.OK)
             {
                 area.TopLeftX = dialog.AreaX;
@@ -1051,6 +1116,12 @@ namespace LabelTool
 
             var area = _collectionAreas[index];
             var dialog = new FormAreaDialog(false, 0.8f, area.Name, area.TopLeftX, area.TopLeftY, area.Width, area.Height);
+            dialog.ValidateName = name =>
+            {
+                if (IsCollectionNameDuplicate(name, index))
+                    return $"采集区域名称 \"{name}\" 已存在，请使用其他名称。";
+                return null;
+            };
             if (dialog.ShowDialog() == DialogResult.OK)
             {
                 area.TopLeftX = dialog.AreaX;
@@ -1083,6 +1154,12 @@ namespace LabelTool
                 // 检测区域
                 string defaultName = $"检测区域{_verificationAreas.Count + 1}";
                 var dialog = new FormAreaDialog(true, _matchThreshold, defaultName, imgX, imgY, imgWidth, imgHeight);
+                dialog.ValidateName = name =>
+                {
+                    if (IsVerificationNameDuplicate(name))
+                        return $"检测区域名称 \"{name}\" 已存在，请使用其他名称。";
+                    return null;
+                };
                 if (dialog.ShowDialog() == DialogResult.OK)
                 {
                     var area = new ImageVerificationArea
@@ -1110,6 +1187,12 @@ namespace LabelTool
                 // 采集区域
                 string defaultName = $"采集区域{_collectionAreas.Count + 1}";
                 var dialog = new FormAreaDialog(false, _matchThreshold, defaultName, imgX, imgY, imgWidth, imgHeight);
+                dialog.ValidateName = name =>
+                {
+                    if (IsCollectionNameDuplicate(name))
+                        return $"采集区域名称 \"{name}\" 已存在，请使用其他名称。";
+                    return null;
+                };
                 if (dialog.ShowDialog() == DialogResult.OK)
                 {
                     var area = new ImageCollectionArea
@@ -1194,7 +1277,7 @@ namespace LabelTool
 
                 var frontColor = i == _selectedVerificationIndex ? Color.Cyan : Color.LightSkyBlue;
                 var backColor =  Color.FromArgb(200, Color.Black);
-                DrawArea(e.Graphics, rect, frontColor, backColor, "检测: " + Path.GetFileNameWithoutExtension(area.FileName));
+                DrawArea(e.Graphics, rect, frontColor, backColor, "检测: " + Path.GetFileNameWithoutExtension(area.FileName), i == _selectedVerificationIndex);
             }
 
             // 绘制采集区域（橙色）
@@ -1209,7 +1292,7 @@ namespace LabelTool
 
                 var frontColor = i == _selectedCollectionIndex ? Color.Yellow : COLLECTION_COLOR;
                 var backColor = Color.FromArgb(200, Color.Black);
-                DrawArea(e.Graphics, rect, frontColor, backColor, area.Name);
+                DrawArea(e.Graphics, rect, frontColor, backColor, area.Name, i == _selectedCollectionIndex);
             }
 
             // 绘制当前拖拽的矩形
@@ -1225,7 +1308,7 @@ namespace LabelTool
             }
         }
 
-        private void DrawArea(Graphics g, Rectangle rect, Color frontColor, Color backColor, string label)
+        private void DrawArea(Graphics g, Rectangle rect, Color frontColor, Color backColor, string label, bool isSelected)
         {
             using (var pen = new Pen(frontColor, 2))
             using (var brush = new SolidBrush(Color.FromArgb(50, frontColor)))
@@ -1241,7 +1324,92 @@ namespace LabelTool
                 g.FillRectangle(new SolidBrush(Color.FromArgb(200, backColor)),
                     rect.X, rect.Y - (int)size.Height - 2, (int)size.Width + 4, (int)size.Height + 2);
                 g.DrawString(label, font, textBrush, rect.X + 2, rect.Y - (int)size.Height - 2);
+
+                // 如果是选中状态，绘制8个缩放手柄
+                if (isSelected)
+                {
+                    int handleSize = 8;
+                    using (var handleBrush = new SolidBrush(frontColor))
+                    using (var handlePen = new Pen(Color.White, 1))
+                    {
+                        foreach (var handleRect in GetHandleRects(rect, handleSize))
+                        {
+                            g.FillRectangle(handleBrush, handleRect);
+                            g.DrawRectangle(handlePen, handleRect);
+                        }
+                    }
+                }
             }
+        }
+
+        /// <summary>
+        /// 获取8个缩放手柄的位置
+        /// </summary>
+        private Rectangle[] GetHandlePositions(Rectangle rect, int handleSize)
+        {
+            return GetHandleRects(rect, handleSize);
+        }
+
+        /// <summary>
+        /// 根据手柄编号设置对应的鼠标光标
+        /// </summary>
+        private void SetCursorForHandle(int handle)
+        {
+            switch (handle)
+            {
+                case 0: // 左上
+                case 4: // 右下
+                    _imagePanel.Cursor = Cursors.SizeNWSE;
+                    break;
+                case 2: // 右上
+                case 6: // 左下
+                    _imagePanel.Cursor = Cursors.SizeNESW;
+                    break;
+                case 1: // 上
+                case 5: // 下
+                    _imagePanel.Cursor = Cursors.SizeNS;
+                    break;
+                case 3: // 右
+                case 7: // 左
+                    _imagePanel.Cursor = Cursors.SizeWE;
+                    break;
+                default:
+                    _imagePanel.Cursor = Cursors.Default;
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// 检测鼠标位置是否在缩放手柄范围内，并更新鼠标光标
+        /// </summary>
+        private void UpdateCursorForResizeHandles(Point mousePos)
+        {
+            if (_screenshot == null) return;
+
+            float scaleX = (float)_imagePanel.Width / _screenshot.Width;
+            float scaleY = (float)_imagePanel.Height / _screenshot.Height;
+
+            // 检查检测区域
+            if (_selectedVerificationIndex >= 0)
+            {
+                var area = _verificationAreas[_selectedVerificationIndex];
+                var rect = GetScaledRect(area, scaleX, scaleY);
+                int handle = GetResizeHandle(rect, mousePos);
+                SetCursorForHandle(handle);
+                return;
+            }
+
+            // 检查采集区域
+            if (_selectedCollectionIndex >= 0)
+            {
+                var area = _collectionAreas[_selectedCollectionIndex];
+                var rect = GetScaledRect(area, scaleX, scaleY);
+                int handle = GetResizeHandle(rect, mousePos);
+                SetCursorForHandle(handle);
+                return;
+            }
+
+            _imagePanel.Cursor = Cursors.Default;
         }
 
         #endregion
@@ -1363,7 +1531,8 @@ namespace LabelTool
             var path = Path.Combine(resourcesDir, fileName);
             if (File.Exists(path))
             {
-                return Image.FromFile(path);
+                byte[] data = File.ReadAllBytes(path);
+                return Image.FromStream(new MemoryStream(data));
             }
             return null;
         }
