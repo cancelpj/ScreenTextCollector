@@ -59,15 +59,19 @@ namespace ScreenTextCollector
                                 // 构建遥测数据
                                 var telemetry = new Dictionary<string, object>
                                 {
-                                    { "CLIENT", mqttBrokerConfig.ClientId },
-                                    { "DEVICECODE", Tool.Settings.DeviceName },
-                                    { "EQUIPMENT", Tool.Settings.DeviceName },
-                                    { "GROUPCODE", mqttBrokerConfig.GroupCode },
                                     { "TIMESTAMP", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }
                                 };
                                 foreach (var item in data)
                                 {
                                     telemetry[item.Key] = item.Value;
+                                }
+                                // 添加配置的扩展字段
+                                if (mqttBrokerConfig.ExtendPayload != null)
+                                {
+                                    foreach (var item in mqttBrokerConfig.ExtendPayload)
+                                    {
+                                        telemetry[item.Key] = item.Value;
+                                    }
                                 }
 
                                 string payloadJson = JsonConvert.SerializeObject(telemetry);

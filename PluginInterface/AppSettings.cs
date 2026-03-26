@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace PluginInterface
 {
     /// <summary>
@@ -6,11 +8,6 @@ namespace PluginInterface
     /// </summary>
     public class AppSettings
     {
-        /// <summary>
-        /// 采集点名称
-        /// </summary>
-        public string DeviceName { get; set; }
-
         /// <summary>
         /// 本地 csv 文件记录
         /// </summary>
@@ -56,6 +53,10 @@ namespace PluginInterface
         public string Username { get; set; }
         public string Password { get; set; }
         public string Topic { get; set; }
-        public string GroupCode { get; set; } = "collection";
+
+        /// <summary>
+        /// MQTT 扩展 Payload 字段，用于向发送的 payload 添加额外的键值对
+        /// </summary>
+        public Dictionary<string, string> ExtendPayload { get; set; }
     }
 }

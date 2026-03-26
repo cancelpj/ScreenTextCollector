@@ -16,7 +16,6 @@ namespace ScreenTextCollector.Tests
             var settings = new AppSettings();
 
             // Assert
-            Assert.Null(settings.DeviceName);
             Assert.False(settings.CsvRecord);
             Assert.Null(settings.Http);
             Assert.Null(settings.MqttBroker);
@@ -28,14 +27,12 @@ namespace ScreenTextCollector.Tests
             // Arrange
             var settings = new AppSettings
             {
-                DeviceName = "测试设备",
                 CsvRecord = true,
                 Http = new HttpConfig { EnableHttp = true, Ip = "127.0.0.1", Port = 8080 },
                 MqttBroker = new MqttBrokerConfig { EnableMqttPush = true, Ip = "localhost", Port = 1883 }
             };
 
             // Assert
-            Assert.Equal("测试设备", settings.DeviceName);
             Assert.True(settings.CsvRecord);
             Assert.NotNull(settings.Http);
             Assert.NotNull(settings.MqttBroker);
@@ -94,7 +91,6 @@ namespace ScreenTextCollector.Tests
             // Assert
             Assert.False(mqttConfig.EnableMqttPush);
             Assert.Equal(1883, mqttConfig.Port);
-            Assert.Equal("collection", mqttConfig.GroupCode);
             Assert.Equal(0, mqttConfig.CaptureFrequency);
         }
 
