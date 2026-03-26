@@ -1,16 +1,16 @@
-using PluginInterface;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Drawing.Drawing2D;
 using System.IO;
+using System.Reflection;
 using System.Windows.Forms;
+using PluginInterface;
 
 namespace LabelTool
 {
-    public class FormMain : Form
+    public partial class FormMain : Form
     {
-        private const string Title = "截屏采集标注工具 V1.2";
+        private const string Title = "截屏采集标注工具 V1.3";
 
         // 截屏图片
         private Bitmap _screenshot;
@@ -33,16 +33,16 @@ namespace LabelTool
         private int _selectedCollectionIndex = -1;
 
         // 当前操作模式
-        private bool _isVerificationMode = true; // true=检测区域, false=采集区域
+        private bool _isVerificationAreaMode = true; // true=检测区域, false=采集区域
 
         // 匹配阈值
         private float _matchThreshold = 0.8f;
 
         // 当前屏幕编号
-        private int _screenNumber = 0;
+        private int _screenNumber;
 
         // 是否有未保存的更改
-        private bool _isModify = false;
+        private bool _isModify;
 
         // 颜色定义（红绿色盲友好）
         private Color VERIFICATION_COLOR = Color.FromArgb(0, 0, 255); // 蓝色
@@ -72,8 +72,8 @@ namespace LabelTool
         private ToolStripSeparator _toolStripSeparator1;
         private ToolStripLabel _toolStripLabel1;
         private ToolStripComboBox _thresholdComboBox;
-        private RadioButton _radioVerification;
-        private RadioButton _radioCollection;
+        private RadioButton _radioVerificationArea;
+        private RadioButton _radioCollectionArea;
         private Label _lblTabHint;
         private ToolTip _toolTip;
         private ToolStripButton _btnCapture;
@@ -96,120 +96,6 @@ namespace LabelTool
         private static readonly float[] _handleFX = { 0f, 0.5f, 1f, 1f, 1f, 0.5f, 0f, 0f };
         private static readonly float[] _handleFY = { 0f, 0f, 0f, 0.5f, 1f, 1f, 1f, 0.5f };
 
-        /// <summary>
-        /// 获取图片在面板上的绘制偏移（考虑缩放和平移）
-        /// </summary>
-        private (float scaleX, float scaleY, float offsetX, float offsetY) GetImageTransform()
-        {
-            if (_screenshot == null)
-                return (1, 1, 0, 0);
-
-            if (_isAutoZoom)
-            {
-                float scale = Math.Min(
-                    (float)_scrollContainer.ClientSize.Width / _screenshot.Width,
-                    (float)_scrollContainer.ClientSize.Height / _screenshot.Height);
-                int drawW = (int)(_screenshot.Width * scale);
-                int drawH = (int)(_screenshot.Height * scale);
-                return (scale, scale,
-                    (_scrollContainer.ClientSize.Width - drawW) / 2f,
-                    (_scrollContainer.ClientSize.Height - drawH) / 2f);
-            }
-            else
-            {
-                return (_zoomLevel, _zoomLevel, 0, 0);
-            }
-        }
-
-        /// <summary>
-        /// 将面板坐标转换为图片坐标
-        /// </summary>
-        private Point PanelToImage(Point panelPoint)
-        {
-            var (scaleX, scaleY, offsetX, offsetY) = GetImageTransform();
-            int imgX = (int)((panelPoint.X - offsetX) / scaleX);
-            int imgY = (int)((panelPoint.Y - offsetY) / scaleY);
-            return new Point(imgX, imgY);
-        }
-
-        /// <summary>
-        /// 将图片坐标转换为面板坐标
-        /// </summary>
-        private Point ImageToPanel(int imgX, int imgY)
-        {
-            var (scaleX, scaleY, offsetX, offsetY) = GetImageTransform();
-            int panelX = (int)(imgX * scaleX + offsetX);
-            int panelY = (int)(imgY * scaleY + offsetY);
-            return new Point(panelX, panelY);
-        }
-
-        /// <summary>
-        /// 将图片区域转换为面板区域
-        /// </summary>
-        private Rectangle ImageToPanelRect(ImageVerificationArea area)
-        {
-            var (scaleX, scaleY, offsetX, offsetY) = GetImageTransform();
-            return new Rectangle(
-                (int)(area.TopLeftX * scaleX + offsetX),
-                (int)(area.TopLeftY * scaleY + offsetY),
-                (int)(area.Width * scaleX),
-                (int)(area.Height * scaleY));
-        }
-
-        private Rectangle ImageToPanelRect(ImageCollectionArea area)
-        {
-            var (scaleX, scaleY, offsetX, offsetY) = GetImageTransform();
-            return new Rectangle(
-                (int)(area.TopLeftX * scaleX + offsetX),
-                (int)(area.TopLeftY * scaleY + offsetY),
-                (int)(area.Width * scaleX),
-                (int)(area.Height * scaleY));
-        }
-
-        /// <summary>
-        /// 根据基准矩形和手柄大小，计算 8 个手柄的 Rectangle（左上→顺时针→左）
-        /// </summary>
-        private static Rectangle[] GetHandleRects(Rectangle rect, int handleSize)
-        {
-            var rects = new Rectangle[8];
-            for (int i = 0; i < 8; i++)
-            {
-                int cx = (int)(rect.X + rect.Width * _handleFX[i]);
-                int cy = (int)(rect.Y + rect.Height * _handleFY[i]);
-                rects[i] = new Rectangle(cx - handleSize / 2, cy - handleSize / 2, handleSize, handleSize);
-            }
-            return rects;
-        }
-
-        /// <summary>
-        /// 检查采集区域名称是否与已有区域重复（排除自身）
-        /// </summary>
-        private bool IsCollectionNameDuplicate(string name, int excludeIndex = -1)
-        {
-            for (int i = 0; i < _collectionAreas.Count; i++)
-            {
-                if (i == excludeIndex) continue;
-                if (string.Equals(_collectionAreas[i].Name, name, StringComparison.OrdinalIgnoreCase))
-                    return true;
-            }
-            return false;
-        }
-
-        /// <summary>
-        /// 检查检测区域名称是否与已有区域重复（排除自身）
-        /// </summary>
-        private bool IsVerificationNameDuplicate(string name, int excludeIndex = -1)
-        {
-            for (int i = 0; i < _verificationAreas.Count; i++)
-            {
-                if (i == excludeIndex) continue;
-                if (string.Equals(Path.GetFileNameWithoutExtension(_verificationAreas[i].FileName),
-                    name, StringComparison.OrdinalIgnoreCase))
-                    return true;
-            }
-            return false;
-        }
-
         public FormMain()
         {
             InitializeComponent();
@@ -220,159 +106,40 @@ namespace LabelTool
             {
                 using (var bmp = new Bitmap(appIconPath))
                 {
-                    this.Icon = Icon.FromHandle(bmp.GetHicon());
+                    Icon = Icon.FromHandle(bmp.GetHicon());
                 }
             }
             // 启用键盘快捷键捕获
-            this.KeyPreview = true;
-            this.KeyDown += FormMain_KeyDown;
+            KeyPreview = true;
+            KeyDown += FormMain_KeyDown;
             // 启动时最大化窗口
             WindowState = FormWindowState.Maximized;
-            this.Load += FormMain_Load;
-            this.FormClosing += FormMain_FormClosing;
-        }
-
-        private void FormMain_KeyDown(object sender, KeyEventArgs e)
-        {
-            // Ctrl+R: 重新截屏
-            if (e.Control && e.KeyCode == Keys.R)
-            {
-                BtnCapture_Click(this, EventArgs.Empty);
-                e.SuppressKeyPress = true;
-            }
-            // Ctrl+S: 保存配置
-            else if (e.Control && e.KeyCode == Keys.S)
-            {
-                BtnSave_Click(this, EventArgs.Empty);
-                e.SuppressKeyPress = true;
-            }
-            // Ctrl+O: 用记事本打开配置
-            else if (e.Control && e.KeyCode == Keys.O)
-            {
-                BtnOpenConfig_Click(this, EventArgs.Empty);
-                e.SuppressKeyPress = true;
-            }
-        }
-
-        private void FormMain_FormClosing(object sender, FormClosingEventArgs e)
-        {
-            if (_isModify)
-            {
-                var result = MessageBox.Show("检测到未保存的修改，是否保存？", "未保存的更改",
-                    MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
-
-                if (result == DialogResult.Yes)
-                {
-                    SaveConfig();
-                }
-                else if (result == DialogResult.Cancel)
-                {
-                    e.Cancel = true;
-                }
-            }
-        }
-
-        private void FormMain_Load(object sender, EventArgs e)
-        {
-            // 初始化 ToolTip
-            _toolTip = new ToolTip();
-            _toolTip.SetToolTip(_toolStrip, "工具栏：重新截屏 | 保存配置 | 用记事本打开配置 | OCR测试");
-
-            // 检查是否存在旧配置文件
-            var configPath = GetConfigPath();
-            var screenshotPath = GetScreenshotPath();
-            if (File.Exists(configPath))
-            {
-                // 检查截图文件是否存在
-                bool screenshotExists = File.Exists(screenshotPath);
-
-                string message = screenshotExists
-                    ? "已存在旧配置，是否加载？"
-                    : "已存在旧配置文件，但截图文件不存在，是否加载配置？";
-
-                var result = MessageBox.Show(message, "加载配置",
-                    MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-
-                if (result == DialogResult.Yes)
-                {
-                    // 加载配置（包括截图）
-                    LoadConfig();
-                }
-                else
-                {
-                    // 清除旧配置，弹出屏幕选择对话框
-                    DeleteOldConfig();
-                    SelectScreenAndCapture(sender, e);
-                }
-            }
-            else
-            {
-                // 没有配置文件，弹出屏幕选择对话框
-                SelectScreenAndCapture(sender, e);
-            }
-
-            // 设置默认选中检测区域
-            _radioVerification.Checked = true;
-            _isVerificationMode = true;
-
-            // 更新状态栏
-            _statusLabel.Text = "就绪";
-        }
-
-        /// <summary>
-        /// 选择屏幕并截屏
-        /// </summary>
-        private void SelectScreenAndCapture(object sender, EventArgs e)
-        {
-            // 获取所有屏幕
-            var screens = Screen.AllScreens;
-
-            // 如果只有一个屏幕，直接截屏不弹窗
-            if (screens.Length == 1)
-            {
-                _screenNumber = 0;
-                CaptureScreen(_screenNumber);
-                return;
-            }
-
-            using (var screenSelectDialog = new FormScreenSelect())
-            {
-                if (screenSelectDialog.ShowDialog() == DialogResult.OK)
-                {
-                    _screenNumber = screenSelectDialog.SelectedScreenNumber;
-                    // 使用选中的屏幕截屏
-                    CaptureScreen(_screenNumber);
-                }
-                else
-                {
-                    // 用户取消，直接返回主界面，不截屏
-                    _statusLabel.Text = "已取消截屏";
-                    return;
-                }
-            }
+            Load += FormMain_Load;
+            FormClosing += FormMain_FormClosing;
         }
 
         private void InitializeComponent()
         {
-            this._toolStrip = new System.Windows.Forms.ToolStrip();
-            this._scrollContainer = new Panel();
-            this._imagePanel = new System.Windows.Forms.Panel();
+            _toolStrip = new ToolStrip();
+            _scrollContainer = new Panel();
+            _imagePanel = new Panel();
             // 启用双缓冲，减少闪烁
-            this._imagePanel.GetType().GetProperty("DoubleBuffered",
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
-                .SetValue(this._imagePanel, true, null);
-            this._listPanel = new System.Windows.Forms.Panel();
-            this._verificationGroup = new System.Windows.Forms.GroupBox();
-            this._collectionGroup = new System.Windows.Forms.GroupBox();
-            this._statusStrip = new System.Windows.Forms.StatusStrip();
-            this._statusLabel = new System.Windows.Forms.ToolStripStatusLabel();
-            this._toolStripSeparator1 = new System.Windows.Forms.ToolStripSeparator();
-            this._toolStripLabel1 = new System.Windows.Forms.ToolStripLabel();
-            this._thresholdComboBox = new System.Windows.Forms.ToolStripComboBox();
-            this._radioVerification = new System.Windows.Forms.RadioButton();
-            this._radioCollection = new System.Windows.Forms.RadioButton();
+            _imagePanel.GetType().GetProperty("DoubleBuffered",
+                BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(_imagePanel, true, null);
+            _listPanel = new Panel();
+            _verificationGroup = new GroupBox();
+            _collectionGroup = new GroupBox();
+            _statusStrip = new StatusStrip();
+            _statusLabel = new ToolStripStatusLabel();
+            _toolStripSeparator1 = new ToolStripSeparator();
+            _toolStripLabel1 = new ToolStripLabel();
+            _thresholdComboBox = new ToolStripComboBox();
+            _radioVerificationArea = new RadioButton();
+            _radioCollectionArea = new RadioButton();
 
-            // ToolStrip
+            #region 工具栏 ToolStrip
+
             // 加载图标资源
             var resourcesDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources");
             var screenshotIcon = LoadIconFromResources(resourcesDir, "Screenshot.png");
@@ -385,65 +152,65 @@ namespace LabelTool
             _btnCapture = new ToolStripButton("重新截屏 Ctrl+R", screenshotIcon, BtnCapture_Click);
             _btnSave = new ToolStripButton("保存配置 Ctrl+S", saveIcon, BtnSave_Click);
             _btnOpenConfig = new ToolStripButton("用记事本打开配置 Ctrl+O", openIcon, BtnOpenConfig_Click);
-            _btnAbout = new ToolStripButton("关于", aboutIcon, BtnAbout_Click);
-            this._toolStrip.Items.Add(_btnCapture);
-            this._toolStrip.Items.Add(_btnSave);
-            this._toolStrip.Items.Add(_btnOpenConfig);
-            this._toolStrip.Items.Add(this._toolStripSeparator1);
-            this._toolStrip.Items.Add(this._toolStripLabel1);
-            this._toolStrip.Items.Add(this._thresholdComboBox);
-            // 使用 Spring 属性将关于按钮推到右边
-            this._toolStrip.Items.Add(new ToolStripSeparator());
-            _btnAbout.Alignment = ToolStripItemAlignment.Right;
-            this._toolStrip.Items.Add(_btnAbout);
-            this._toolStrip.Location = new Point(0, 0);
-            this._toolStrip.Name = "_toolStrip";
-            this._toolStrip.Size = new Size(1024, 25);
-            this._toolStrip.TabIndex = 1;
+            _toolStrip.Items.Add(_btnCapture);
+            _toolStrip.Items.Add(_btnSave);
+            _toolStrip.Items.Add(_btnOpenConfig);
 
-            // 设置 ToolTip（在 FormMain_Load 中初始化 _toolTip 后设置）
+            // 使用 Spring 属性将关于按钮推到右边
+            _toolStrip.Items.Add(new ToolStripSeparator());
+            _btnAbout = new ToolStripButton("关于", aboutIcon, BtnAbout_Click);
+            _btnAbout.Alignment = ToolStripItemAlignment.Right;
+            _toolStrip.Items.Add(_btnAbout);
+            _toolStrip.Location = new Point(0, 0);
+            _toolStrip.Name = "_toolStrip";
+            _toolStrip.Size = new Size(1024, 25);
+            _toolStrip.TabIndex = 1;
 
             // 匹配阈值下拉框
-            this._toolStripLabel1.Text = "匹配阈值:";
-            this._thresholdComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
-            this._thresholdComboBox.Items.AddRange(new object[] { "0.7", "0.8", "0.85", "0.9", "0.95" });
-            this._thresholdComboBox.SelectedIndex = 1; // 默认0.8
-            this._thresholdComboBox.SelectedIndexChanged += ThresholdComboBox_SelectedIndexChanged;
+            _toolStrip.Items.Add(_toolStripSeparator1);
+            _toolStripLabel1.Text = "匹配阈值:";
+            _thresholdComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            _thresholdComboBox.Items.AddRange(new object[] { "0.7", "0.8", "0.85", "0.9", "0.95" });
+            _thresholdComboBox.SelectedIndex = 1; // 默认0.8
+            _thresholdComboBox.SelectedIndexChanged += ThresholdComboBox_SelectedIndexChanged;
+            _toolStrip.Items.Add(_toolStripLabel1);
+            _toolStrip.Items.Add(_thresholdComboBox);
 
             // OCR引擎下拉框
             var toolStripSeparator2 = new ToolStripSeparator();
-            this._ocrEngineLabel = new ToolStripLabel();
-            this._ocrEngineLabel.Text = "OCR引擎:";
-            this._ocrEngineComboBox = new ToolStripComboBox();
-            this._ocrEngineComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
-            this._ocrEngineComboBox.Items.AddRange(new object[] { "PaddleOCR", "OpenCvSharp" });
-            this._ocrEngineComboBox.SelectedIndex = 0; // 默认PaddleOCR
-            this._ocrEngineComboBox.SelectedIndexChanged += OcrEngineComboBox_SelectedIndexChanged;
-            this._toolStrip.Items.Add(toolStripSeparator2);
-            this._toolStrip.Items.Add(this._ocrEngineLabel);
-            this._toolStrip.Items.Add(this._ocrEngineComboBox);
+            _ocrEngineLabel = new ToolStripLabel();
+            _ocrEngineLabel.Text = "OCR引擎:";
+            _ocrEngineComboBox = new ToolStripComboBox();
+            _ocrEngineComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            _ocrEngineComboBox.Items.AddRange(new object[] { "PaddleOCR", "OpenCvSharp" });
+            _ocrEngineComboBox.SelectedIndex = 0; // 默认PaddleOCR
+            _ocrEngineComboBox.SelectedIndexChanged += OcrEngineComboBox_SelectedIndexChanged;
+            _toolStrip.Items.Add(toolStripSeparator2);
+            _toolStrip.Items.Add(_ocrEngineLabel);
+            _toolStrip.Items.Add(_ocrEngineComboBox);
+
             // OCR测试按钮
             var toolStripSeparator3 = new ToolStripSeparator();
-            this._btnOcrTest = new ToolStripButton("OCR测试", ocrIcon, BtnOcrTest_Click);
-            this._toolStrip.Items.Add(toolStripSeparator3);
-            this._toolStrip.Items.Add(this._btnOcrTest);
+            _btnOcrTest = new ToolStripButton("OCR测试 Ctrl+T", ocrIcon, BtnOcrTest_Click);
+            _toolStrip.Items.Add(toolStripSeparator3);
+            _toolStrip.Items.Add(_btnOcrTest);
 
             // 缩放控制
             var toolStripSeparator4 = new ToolStripSeparator();
-            this._cmbZoomMode = new ToolStripComboBox();
-            this._cmbZoomMode.DropDownStyle = ComboBoxStyle.DropDownList;
-            this._cmbZoomMode.Items.AddRange(new object[] { "自动缩放", "手动缩放" });
-            this._cmbZoomMode.SelectedIndex = 0; // 默认自动缩放
-            this._cmbZoomMode.SelectedIndexChanged += CmbZoomMode_SelectedIndexChanged;
-            this._cmbZoomLevel = new ToolStripComboBox();
-            this._cmbZoomLevel.DropDownStyle = ComboBoxStyle.DropDown;
-            this._cmbZoomLevel.Items.AddRange(new object[] { "50%", "75%", "100%", "125%", "150%" });
-            this._cmbZoomLevel.SelectedIndex = 2; // 默认100%
-            this._cmbZoomLevel.TextChanged += CmbZoomLevel_TextChanged;
-            this._cmbZoomLevel.KeyDown += CmbZoomLevel_KeyDown;
-            this._btnZoomOut = new ToolStripButton("-", null, BtnZoomOut_Click);
-            this._btnZoomOut.ToolTipText = "缩小";
-            this._zoomTrackBar = new TrackBar
+            _cmbZoomMode = new ToolStripComboBox();
+            _cmbZoomMode.DropDownStyle = ComboBoxStyle.DropDownList;
+            _cmbZoomMode.Items.AddRange(new object[] { "自动缩放", "手动缩放" });
+            _cmbZoomMode.SelectedIndex = 0; // 默认自动缩放
+            _cmbZoomMode.SelectedIndexChanged += CmbZoomMode_SelectedIndexChanged;
+            _cmbZoomLevel = new ToolStripComboBox();
+            _cmbZoomLevel.DropDownStyle = ComboBoxStyle.DropDown;
+            _cmbZoomLevel.Items.AddRange(new object[] { "50%", "75%", "100%", "125%", "150%" });
+            _cmbZoomLevel.SelectedIndex = 2; // 默认100%
+            _cmbZoomLevel.TextChanged += CmbZoomLevel_TextChanged;
+            _cmbZoomLevel.KeyDown += CmbZoomLevel_KeyDown;
+            _btnZoomOut = new ToolStripButton("-", null, BtnZoomOut_Click);
+            _btnZoomOut.ToolTipText = "缩小";
+            _zoomTrackBar = new TrackBar
             {
                 TickStyle = TickStyle.None,
                 AutoSize = false,
@@ -455,24 +222,26 @@ namespace LabelTool
                 Enabled = false
             };
             // TrackBar 垂直居中（ToolStrip 高度约25）
-            this._zoomTrackBar.Top = (_toolStrip.Height - _zoomTrackBar.Height) / 2;
-            this._zoomTrackBar.Scroll += ZoomTrackBar_Scroll;
-            this._zoomTrackBarHost = new ToolStripControlHost(_zoomTrackBar);
-            this._zoomTrackBarHost.Padding = Padding.Empty;
-            this._zoomTrackBarHost.Margin = new Padding(2, 0, 2, 0);
-            this._btnZoomIn = new ToolStripButton("+", null, BtnZoomIn_Click);
-            this._btnZoomIn.ToolTipText = "放大";
+            _zoomTrackBar.Top = (_toolStrip.Height - _zoomTrackBar.Height) / 2;
+            _zoomTrackBar.Scroll += ZoomTrackBar_Scroll;
+            _zoomTrackBarHost = new ToolStripControlHost(_zoomTrackBar);
+            _zoomTrackBarHost.Padding = Padding.Empty;
+            _zoomTrackBarHost.Margin = new Padding(2, 0, 2, 0);
+            _btnZoomIn = new ToolStripButton("+", null, BtnZoomIn_Click);
+            _btnZoomIn.ToolTipText = "放大";
 
-            this._toolStrip.Items.Add(toolStripSeparator4);
-            this._toolStrip.Items.Add(this._cmbZoomMode);
-            this._toolStrip.Items.Add(new ToolStripSeparator());
-            this._toolStrip.Items.Add(this._cmbZoomLevel);
-            this._toolStrip.Items.Add(this._btnZoomOut);
-            this._toolStrip.Items.Add(this._zoomTrackBarHost);
-            this._toolStrip.Items.Add(this._btnZoomIn);
+            _toolStrip.Items.Add(toolStripSeparator4);
+            _toolStrip.Items.Add(_cmbZoomMode);
+            _toolStrip.Items.Add(new ToolStripSeparator());
+            _toolStrip.Items.Add(_cmbZoomLevel);
+            _toolStrip.Items.Add(_btnZoomOut);
+            _toolStrip.Items.Add(_zoomTrackBarHost);
+            _toolStrip.Items.Add(_btnZoomIn);
+
+            #endregion
 
             // 垂直SplitContainer（左侧图片，右侧列表）
-            this._verticalSplit = new SplitContainer
+            _verticalSplit = new SplitContainer
             {
                 Dock = DockStyle.Fill,
                 Orientation = Orientation.Vertical,
@@ -481,52 +250,49 @@ namespace LabelTool
             };
 
             // ImagePanel 和滚动容器
-            this._scrollContainer = new Panel
+            _scrollContainer = new Panel
             {
                 Dock = DockStyle.Fill,
                 AutoScroll = true,
                 AutoScrollMinSize = new Size(1, 1),
                 BackColor = Color.Black
             };
-            this._imagePanel.BackColor = Color.Black;
-            this._imagePanel.Name = "_imagePanel";
-            this._imagePanel.Size = new Size(698, 398);
-            this._imagePanel.TabIndex = 0;
-            this._imagePanel.Paint += ImagePanel_Paint;
-            this._imagePanel.MouseDown += ImagePanel_MouseDown;
-            this._imagePanel.MouseMove += ImagePanel_MouseMove;
-            this._imagePanel.MouseUp += ImagePanel_MouseUp;
-            this._imagePanel.MouseClick += ImagePanel_MouseClick;
-            this._imagePanel.MouseDoubleClick += ImagePanel_MouseDoubleClick;
-            this._imagePanel.MouseEnter += ImagePanel_MouseEnter;
-            this._imagePanel.MouseLeave += ImagePanel_MouseLeave;
-            this._imagePanel.MouseWheel += ImagePanel_MouseWheel;
-            this._imagePanel.KeyDown += ImagePanel_KeyDown;
-            this._imagePanel.TabIndex = 0;
-            this._imagePanel.TabStop = true;
+            _imagePanel.BackColor = Color.Black;
+            _imagePanel.Name = "_imagePanel";
+            _imagePanel.Size = new Size(698, 398);
+            _imagePanel.TabIndex = 0;
+            _imagePanel.Paint += ImagePanel_Paint;
+            _imagePanel.MouseDown += ImagePanel_MouseDown;
+            _imagePanel.MouseMove += ImagePanel_MouseMove;
+            _imagePanel.MouseUp += ImagePanel_MouseUp;
+            _imagePanel.MouseClick += ImagePanel_MouseClick;
+            _imagePanel.MouseDoubleClick += ImagePanel_MouseDoubleClick;
+            _imagePanel.MouseEnter += ImagePanel_MouseEnter;
+            _imagePanel.MouseLeave += ImagePanel_MouseLeave;
+            _imagePanel.MouseWheel += ImagePanel_MouseWheel;
+            _imagePanel.KeyDown += ImagePanel_KeyDown;
+            _imagePanel.TabIndex = 0;
+            _imagePanel.TabStop = true;
 
             // ListPanel
-            this._listPanel.Dock = DockStyle.Fill;
-            this._listPanel.Name = "_listPanel";
+            _listPanel.Dock = DockStyle.Fill;
+            _listPanel.Name = "_listPanel";
 
-            this._scrollContainer.Controls.Add(this._imagePanel);
-            this._verticalSplit.Panel1.Controls.Add(this._scrollContainer);
-            this._verticalSplit.Panel2.Controls.Add(this._listPanel);
-
-            // 不再需要水平SplitContainer，直接使用垂直SplitContainer
-            // SplitContainer - 水平分割（检测区域在上，采集区域在下） - 已移除
+            _scrollContainer.Controls.Add(_imagePanel);
+            _verticalSplit.Panel1.Controls.Add(_scrollContainer);
+            _verticalSplit.Panel2.Controls.Add(_listPanel);
 
             // VerificationGroup
-            this._verificationGroup.Dock = DockStyle.Top;
-            this._verificationGroup.Name = "_verificationGroup";
-            this._verificationGroup.Size = new Size(318, 200);
-            this._verificationGroup.TabIndex = 0;
-            this._verificationGroup.TabStop = false;
-            this._verificationGroup.Text = "检测区域";
-            this._verificationGroup.Height = 200;
+            _verificationGroup.Dock = DockStyle.Top;
+            _verificationGroup.Name = "_verificationGroup";
+            _verificationGroup.Size = new Size(318, 200);
+            _verificationGroup.TabIndex = 0;
+            _verificationGroup.TabStop = false;
+            _verificationGroup.Text = "检测区域";
+            _verificationGroup.Height = 200;
 
             // Verification ListView
-            this._verificationListView = new ListView
+            _verificationListView = new ListView
             {
                 Dock = DockStyle.Fill,
                 FullRowSelect = true,
@@ -535,27 +301,27 @@ namespace LabelTool
                 MultiSelect = false,
                 OwnerDraw = true
             };
-            this._verificationListView.Columns.Add("名称", 80);
-            this._verificationListView.Columns.Add("位置", 150);
-            this._verificationListView.Columns.Add("", 30);
-            this._verificationListView.SelectedIndexChanged += VerificationListView_SelectedIndexChanged;
-            this._verificationListView.MouseClick += VerificationListView_MouseClick;
-            this._verificationListView.MouseDoubleClick += VerificationListView_MouseDoubleClick;
-            this._verificationListView.DrawColumnHeader += ListView_DrawColumnHeader;
-            this._verificationListView.DrawSubItem += VerificationListView_DrawSubItem;
-            this._verificationGroup.Controls.Add(this._verificationListView);
+            _verificationListView.Columns.Add("名称", 80);
+            _verificationListView.Columns.Add("位置", 150);
+            _verificationListView.Columns.Add("", 30);
+            _verificationListView.SelectedIndexChanged += VerificationListView_SelectedIndexChanged;
+            _verificationListView.MouseClick += VerificationListView_MouseClick;
+            _verificationListView.MouseDoubleClick += VerificationListView_MouseDoubleClick;
+            _verificationListView.DrawColumnHeader += ListView_DrawColumnHeader;
+            _verificationListView.DrawSubItem += VerificationListView_DrawSubItem;
+            _verificationGroup.Controls.Add(_verificationListView);
 
             // CollectionGroup
-            this._collectionGroup.Dock = DockStyle.Fill;
-            this._collectionGroup.Name = "_collectionGroup";
-            this._collectionGroup.Size = new Size(318, 110);
-            this._collectionGroup.TabIndex = 1;
-            this._collectionGroup.TabStop = false;
-            this._collectionGroup.Text = "采集区域";
-            this._collectionGroup.Height = 300;
+            _collectionGroup.Dock = DockStyle.Fill;
+            _collectionGroup.Name = "_collectionGroup";
+            _collectionGroup.Size = new Size(318, 110);
+            _collectionGroup.TabIndex = 1;
+            _collectionGroup.TabStop = false;
+            _collectionGroup.Text = "采集区域";
+            _collectionGroup.Height = 300;
 
             // Collection ListView
-            this._collectionListView = new ListView
+            _collectionListView = new ListView
             {
                 Dock = DockStyle.Fill,
                 FullRowSelect = true,
@@ -564,47 +330,47 @@ namespace LabelTool
                 MultiSelect = false,
                 OwnerDraw = true
             };
-            this._collectionListView.Columns.Add("名称", 80);
-            this._collectionListView.Columns.Add("位置", 150);
-            this._collectionListView.Columns.Add("", 30);
-            this._collectionListView.Columns.Add("识别结果", 200);
-            this._collectionListView.SelectedIndexChanged += CollectionListView_SelectedIndexChanged;
-            this._collectionListView.MouseClick += CollectionListView_MouseClick;
-            this._collectionListView.MouseDoubleClick += CollectionListView_MouseDoubleClick;
-            this._collectionListView.DrawColumnHeader += ListView_DrawColumnHeader;
-            this._collectionListView.DrawSubItem += CollectionListView_DrawSubItem;
-            this._collectionGroup.Controls.Add(this._collectionListView);
+            _collectionListView.Columns.Add("名称", 80);
+            _collectionListView.Columns.Add("位置", 150);
+            _collectionListView.Columns.Add("", 30);
+            _collectionListView.Columns.Add("识别结果", 200);
+            _collectionListView.SelectedIndexChanged += CollectionListView_SelectedIndexChanged;
+            _collectionListView.MouseClick += CollectionListView_MouseClick;
+            _collectionListView.MouseDoubleClick += CollectionListView_MouseDoubleClick;
+            _collectionListView.DrawColumnHeader += ListView_DrawColumnHeader;
+            _collectionListView.DrawSubItem += CollectionListView_DrawSubItem;
+            _collectionGroup.Controls.Add(_collectionListView);
 
             // Radio buttons
-            this._radioVerification.AutoSize = true;
-            this._radioVerification.Name = "_radioVerification";
-            this._radioVerification.Size = new Size(83, 16);
-            this._radioVerification.TabIndex = 3;
-            this._radioVerification.TabStop = true;
-            this._radioVerification.Text = "检测区域";
-            this._radioVerification.UseVisualStyleBackColor = true;
-            this._radioVerification.CheckedChanged += RadioVerification_CheckedChanged;
+            _radioVerificationArea.AutoSize = true;
+            _radioVerificationArea.Name = "_radioVerificationArea";
+            _radioVerificationArea.Size = new Size(83, 16);
+            _radioVerificationArea.TabIndex = 3;
+            _radioVerificationArea.TabStop = true;
+            _radioVerificationArea.Text = "检测区域";
+            _radioVerificationArea.UseVisualStyleBackColor = true;
+            _radioVerificationArea.CheckedChanged += RadioVerificationArea_CheckedChanged;
 
-            this._radioCollection.AutoSize = true;
-            this._radioCollection.Name = "_radioCollection";
-            this._radioCollection.Size = new Size(83, 16);
-            this._radioCollection.TabIndex = 4;
-            this._radioCollection.TabStop = true;
-            this._radioCollection.Text = "采集区域";
-            this._radioCollection.UseVisualStyleBackColor = true;
-            this._radioCollection.CheckedChanged += RadioCollection_CheckedChanged;
+            _radioCollectionArea.AutoSize = true;
+            _radioCollectionArea.Name = "_radioCollectionArea";
+            _radioCollectionArea.Size = new Size(83, 16);
+            _radioCollectionArea.TabIndex = 4;
+            _radioCollectionArea.TabStop = true;
+            _radioCollectionArea.Text = "采集区域";
+            _radioCollectionArea.UseVisualStyleBackColor = true;
+            _radioCollectionArea.CheckedChanged += RadioCollectionArea_CheckedChanged;
 
             // StatusStrip
-            this._statusStrip.Items.AddRange(new ToolStripItem[] { this._statusLabel });
-            this._statusStrip.Location = new Point(0, 571);
-            this._statusStrip.Name = "_statusStrip";
-            this._statusStrip.Size = new Size(1024, 22);
-            this._statusStrip.TabIndex = 5;
+            _statusStrip.Items.AddRange(new ToolStripItem[] { _statusLabel });
+            _statusStrip.Location = new Point(0, 571);
+            _statusStrip.Name = "_statusStrip";
+            _statusStrip.Size = new Size(1024, 22);
+            _statusStrip.TabIndex = 5;
 
             // StatusLabel
-            this._statusLabel.Name = "_statusLabel";
-            this._statusLabel.Size = new Size(50, 17);
-            this._statusLabel.Text = "就绪";
+            _statusLabel.Name = "_statusLabel";
+            _statusLabel.Size = new Size(50, 17);
+            _statusLabel.Text = "就绪";
 
             // ListPanel容器 - 包含GroupBox和RadioButton
             var listContainer = new Panel { Dock = DockStyle.Fill };
@@ -615,7 +381,7 @@ namespace LabelTool
                 Dock = DockStyle.Bottom,
                 Height = 35
             };
-            this._lblTabHint = new Label
+            _lblTabHint = new Label
             {
                 Text = "Tab键切换",
                 Location = new Point(210, 6),
@@ -623,1672 +389,32 @@ namespace LabelTool
                 ForeColor = Color.Fuchsia,
                 Font = new Font("Microsoft YaHei UI", 10F)
             };
-            radioPanel.Controls.Add(this._lblTabHint);
-            radioPanel.Controls.Add(this._radioVerification);
-            radioPanel.Controls.Add(this._radioCollection);
-            this._radioVerification.Location = new Point(10, 8);
-            this._radioCollection.Location = new Point(120, 8);
+            radioPanel.Controls.Add(_lblTabHint);
+            radioPanel.Controls.Add(_radioVerificationArea);
+            radioPanel.Controls.Add(_radioCollectionArea);
+            _radioVerificationArea.Location = new Point(10, 8);
+            _radioCollectionArea.Location = new Point(120, 8);
 
-            listContainer.Controls.Add(this._collectionGroup);
-            listContainer.Controls.Add(this._verificationGroup);
+            listContainer.Controls.Add(_collectionGroup);
+            listContainer.Controls.Add(_verificationGroup);
             listContainer.Controls.Add(radioPanel);
 
-            this._verificationGroup.Location = new Point(0, 0);
-            this._collectionGroup.Location = new Point(0, 200);
-            this._listPanel.Controls.Add(listContainer);
+            _verificationGroup.Location = new Point(0, 0);
+            _collectionGroup.Location = new Point(0, 200);
+            _listPanel.Controls.Add(listContainer);
             listContainer.Dock = DockStyle.Fill;
 
             // FormMain
-            this.AutoScaleDimensions = new SizeF(6F, 12F);
-            this.AutoScaleMode = AutoScaleMode.Font;
-            this.ClientSize = new Size(1024, 593);
-            this.Controls.Add(this._verticalSplit);
-            this.Controls.Add(this._toolStrip);
-            this.Controls.Add(this._statusStrip);
-            this.Name = "FormMain";
-            this.StartPosition = FormStartPosition.CenterScreen;
-            this.Text = Title;
+            AutoScaleDimensions = new SizeF(6F, 12F);
+            AutoScaleMode = AutoScaleMode.Font;
+            ClientSize = new Size(1024, 593);
+            Controls.Add(_verticalSplit);
+            Controls.Add(_toolStrip);
+            Controls.Add(_statusStrip);
+            Name = "FormMain";
+            StartPosition = FormStartPosition.CenterScreen;
+            Text = Title;
         }
-
-        #region 工具栏事件
-
-        private void BtnCapture_Click(object sender, EventArgs e)
-        {
-            var configPath = GetConfigPath();
-
-            // 检查是否存在旧配置文件
-            if (File.Exists(configPath))
-            {
-                // 弹窗警告
-                var result = MessageBox.Show(
-                    "重新截屏将删除现有的所有配置和图片文件，是否继续？",
-                    "确认重新截屏",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Warning);
-
-                if (result != DialogResult.Yes)
-                {
-                    return; // 用户取消
-                }
-
-                // 清理旧配置
-                DeleteOldConfig();
-
-                // 清空内存中的区域列表
-                _verificationAreas.Clear();
-                _collectionAreas.Clear();
-                _selectedVerificationIndex = -1;
-                _selectedCollectionIndex = -1;
-
-                // 刷新列表显示
-                RefreshVerificationList();
-                RefreshCollectionList();
-            }
-
-            // 开始新的截屏流程
-            SelectScreenAndCapture(sender, e);
-        }
-
-        private void BtnSave_Click(object sender, EventArgs e)
-        {
-            SaveConfig();
-        }
-
-        private void BtnOpenConfig_Click(object sender, EventArgs e)
-        {
-            var configPath = GetConfigPath();
-            if (File.Exists(configPath))
-            {
-                System.Diagnostics.Process.Start("notepad.exe", configPath);
-            }
-            else
-            {
-                MessageBox.Show("配置文件不存在", "提示", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
-        }
-
-        private void BtnAbout_Click(object sender, EventArgs e)
-        {
-            MessageBox.Show($"{Title}\n\n用于标注屏幕文字采集的检测和采集区域，生成采集配置文件。",
-                "关于", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-
-        private void ThresholdComboBox_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            if (_thresholdComboBox.SelectedItem != null)
-            {
-                float.TryParse(_thresholdComboBox.SelectedItem.ToString(), out _matchThreshold);
-            }
-        }
-
-        private void OcrEngineComboBox_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            // 切换引擎不再自动刷新OCR结果，由用户手动点击"OCR测试"按钮
-        }
-
-        private void BtnOcrTest_Click(object sender, EventArgs e)
-        {
-            if (_screenshot == null)
-            {
-                MessageBox.Show("请先进行截屏。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-            if (_collectionAreas.Count == 0)
-            {
-                MessageBox.Show("请先添加采集区域。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return;
-            }
-            _btnOcrTest.Enabled = false;
-            _statusLabel.Text = "正在识别...";
-            if (RefreshCollectionListOcrResults()) _statusLabel.Text = "识别完成";
-            _btnOcrTest.Enabled = true;
-        }
-
-        private void CmbZoomMode_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            _isAutoZoom = (_cmbZoomMode.SelectedIndex == 0);
-            if (!_isAutoZoom)
-            {
-                _zoomLevel = 1.0f;
-                UpdateScrollSize();
-            }
-            _imagePanel.Invalidate();
-            UpdateZoomUI();
-        }
-
-        private bool _isUpdatingZoomLevel; // 防止 TextChanged 回环
-
-        private void CmbZoomLevel_TextChanged(object sender, EventArgs e)
-        {
-            if (_isAutoZoom || _screenshot == null || _isUpdatingZoomLevel) return;
-
-            string text = _cmbZoomLevel.Text.TrimEnd('%', ' ');
-            if (float.TryParse(text, out float percent))
-            {
-                float newZoom = Math.Max(MIN_ZOOM, Math.Min(MAX_ZOOM, percent / 100f));
-                if (Math.Abs(_zoomLevel - newZoom) > 0.001f)
-                {
-                    _zoomLevel = newZoom;
-                    UpdateScrollSize();
-                    _imagePanel.Invalidate();
-                    // 同步 TrackBar（避免重新触发 TextChanged）
-                    UpdateTrackBarOnly();
-                }
-            }
-        }
-
-        private void CmbZoomLevel_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.KeyCode == Keys.Enter)
-            {
-                _cmbZoomLevel.Focus(); // 触发 TextChanged
-            }
-        }
-
-        private void UpdateScrollSize()
-        {
-            // 更新滚动容器的内容尺寸（不触发重绘，由调用方决定何时刷新）
-            if (_screenshot == null) return;
-            int w = (int)(_screenshot.Width * _zoomLevel);
-            int h = (int)(_screenshot.Height * _zoomLevel);
-            _imagePanel.Size = new Size(w, h);
-            _scrollContainer.AutoScrollMinSize = new Size(w, h);
-        }
-
-        private void BtnZoomIn_Click(object sender, EventArgs e)
-        {
-            if (_isAutoZoom) return;
-            _zoomLevel = Math.Min(MAX_ZOOM, _zoomLevel + ZOOM_STEP);
-            UpdateScrollSize();
-            _imagePanel.Invalidate();
-            UpdateZoomUI();
-        }
-
-        private void BtnZoomOut_Click(object sender, EventArgs e)
-        {
-            if (_isAutoZoom) return;
-            _zoomLevel = Math.Max(MIN_ZOOM, _zoomLevel - ZOOM_STEP);
-            UpdateScrollSize();
-            _imagePanel.Invalidate();
-            UpdateZoomUI();
-        }
-
-        private void ZoomTrackBar_Scroll(object sender, EventArgs e)
-        {
-            if (_isAutoZoom) return;
-            // 将拖动条位置转换为缩放值
-            _zoomLevel = _zoomTrackBar.Value / 100f;
-            UpdateScrollSize();
-            _imagePanel.Invalidate();
-            UpdateZoomUI();
-        }
-
-        private void UpdateTrackBarOnly()
-        {
-            // 将缩放值转换为拖动条位置
-            _zoomTrackBar.Value = (int)(_zoomLevel * 100);
-        }
-
-        private void UpdateZoomUI()
-        {
-            // 更新缩放显示
-            int percent = (int)(_zoomLevel * 100);
-            _isUpdatingZoomLevel = true;
-            _cmbZoomLevel.Text = percent + "%";
-            _isUpdatingZoomLevel = false;
-
-            // 将缩放值转换为拖动条位置 (0.1-5.0 -> 0-100)
-            UpdateTrackBarOnly();
-
-            // 启用/禁用控件
-            _btnZoomIn.Enabled = !_isAutoZoom && _zoomLevel < MAX_ZOOM;
-            _btnZoomOut.Enabled = !_isAutoZoom && _zoomLevel > MIN_ZOOM;
-            _zoomTrackBar.Enabled = !_isAutoZoom;
-            _cmbZoomLevel.Enabled = !_isAutoZoom;
-        }
-
-        #endregion
-
-        #region 截屏功能
-
-        private void CaptureScreen()
-        {
-            CaptureScreen(_screenNumber);
-        }
-
-        /// <summary>
-        /// 截取指定屏幕
-        /// </summary>
-        /// <param name="screenNumber">屏幕编号</param>
-        private void CaptureScreen(int screenNumber)
-        {
-            try
-            {
-                // 禁用 ToolTip，避免截屏时捕获到 ToolTip
-                if (_toolTip != null)
-                {
-                    _toolTip.Active = false;
-                }
-
-                // 隐藏窗体
-                this.Hide();
-                System.Threading.Thread.Sleep(300);
-
-                // 获取所有屏幕
-                var screens = Screen.AllScreens;
-
-                // 检查屏幕编号是否越界
-                if (screenNumber >= screens.Length)
-                {
-                    screenNumber = 0; // 越界时使用主屏幕
-                }
-
-                // 获取指定屏幕
-                var screen = screens[screenNumber];
-                var screenBounds = screen.Bounds;
-
-                _screenshot = new Bitmap(screenBounds.Width, screenBounds.Height);
-                using (var g = Graphics.FromImage(_screenshot))
-                {
-                    // 从屏幕的实际位置开始截取（考虑多屏幕偏移）
-                    g.CopyFromScreen(screenBounds.Left, screenBounds.Top, 0, 0, screenBounds.Size);
-                }
-
-                // 显示窗体
-                this.Show();
-
-                // 重新启用 ToolTip
-                if (_toolTip != null)
-                {
-                    _toolTip.Active = true;
-                }
-
-                UpdateScrollSize();
-                _imagePanel.Invalidate();
-                _statusLabel.Text = $"截屏完成: {_screenshot.Width}x{_screenshot.Height}";
-            }
-            catch (Exception ex)
-            {
-                this.Show();
-                MessageBox.Show($"截屏失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        #endregion
-
-        #region 鼠标拖拽框选
-
-        private void ImagePanel_MouseDown(object sender, MouseEventArgs e)
-        {
-            if (_screenshot == null) return;
-
-            // 聚焦到图片面板以接收键盘事件
-            _imagePanel.Focus();
-
-            // 鼠标右键开始平移（手动缩放模式）
-            if (e.Button == MouseButtons.Right && !_isAutoZoom)
-            {
-                _isPanning = true;
-                _scrollOffset = new Point(-_scrollContainer.AutoScrollPosition.X, -_scrollContainer.AutoScrollPosition.Y);
-                _lastMousePos = e.Location;
-                _imagePanel.Cursor = Cursors.Hand;
-                return;
-            }
-
-            var (scaleX, scaleY, offsetX, offsetY) = GetImageTransform();
-
-            // 确保选中索引有效
-            if (_selectedVerificationIndex >= _verificationAreas.Count)
-                _selectedVerificationIndex = -1;
-            if (_selectedCollectionIndex >= _collectionAreas.Count)
-                _selectedCollectionIndex = -1;
-
-            // 检查是否点击了选中区域的边缘（缩放）或内部（移动）
-            if (_selectedVerificationIndex >= 0)
-            {
-                var area = _verificationAreas[_selectedVerificationIndex];
-                var panelRect = ImageToPanelRect(area);
-                int handle = GetResizeHandle(panelRect, e.Location);
-
-                if (handle >= 0)
-                {
-                    // 点击了缩放手柄
-                    _isResizingArea = true;
-                    _resizeHandle = handle;
-                }
-                else if (panelRect.Contains(e.Location))
-                {
-                    // 点击了区域内部，开始拖拽移动
-                    _isDraggingArea = true;
-                }
-            }
-            else if (_selectedCollectionIndex >= 0)
-            {
-                var area = _collectionAreas[_selectedCollectionIndex];
-                var panelRect = ImageToPanelRect(area);
-                int handle = GetResizeHandle(panelRect, e.Location);
-
-                if (handle >= 0)
-                {
-                    _isResizingArea = true;
-                    _resizeHandle = handle;
-                }
-                else if (panelRect.Contains(e.Location))
-                {
-                    _isDraggingArea = true;
-                }
-            }
-
-            if (_isDraggingArea || _isResizingArea)
-            {
-                _dragStart = e.Location;
-                _isDragging = true;
-                _imagePanel.Cursor = Cursors.SizeAll;
-            }
-            else
-            {
-                // 新建区域
-                _dragStart = e.Location;
-                _isDragging = true;
-            }
-        }
-
-        private void ImagePanel_MouseMove(object sender, MouseEventArgs e)
-        {
-            if (_screenshot == null) return;
-
-            // 平移（使用滚动条实现）
-            if (_isPanning)
-            {
-                int dx = e.Location.X - _lastMousePos.X;
-                int dy = e.Location.Y - _lastMousePos.Y;
-                // 直接累加偏移量，避免 AutoScrollPosition 读写不对称导致的抖动
-                _scrollOffset.X += dx;
-                _scrollOffset.Y += dy;
-                _scrollContainer.AutoScrollPosition = _scrollOffset;
-                _lastMousePos = e.Location;
-                return;
-            }
-
-            var (scaleX, scaleY, offsetX, offsetY) = GetImageTransform();
-            int deltaImgX = (int)((e.Location.X - _dragStart.X) / scaleX);
-            int deltaImgY = (int)((e.Location.Y - _dragStart.Y) / scaleY);
-
-            if (_screenshot == null || !_isDragging) return;
-
-            if (_isDraggingArea)
-            {
-                // 拖拽移动选中区域
-                if (_selectedVerificationIndex >= 0)
-                {
-                    var area = _verificationAreas[_selectedVerificationIndex];
-                    area.TopLeftX += deltaImgX;
-                    area.TopLeftY += deltaImgY;
-                    RefreshVerificationList();
-                }
-                else if (_selectedCollectionIndex >= 0)
-                {
-                    var area = _collectionAreas[_selectedCollectionIndex];
-                    area.TopLeftX += deltaImgX;
-                    area.TopLeftY += deltaImgY;
-                    RefreshCollectionList();
-                }
-                _dragStart = e.Location;
-                _imagePanel.Invalidate();
-            }
-            else if (_isResizingArea)
-            {
-                // 缩放选中区域
-                if (_selectedVerificationIndex >= 0)
-                {
-                    var area = _verificationAreas[_selectedVerificationIndex];
-                    ResizeArea(area, _resizeHandle, deltaImgX, deltaImgY);
-                    RefreshVerificationList();
-                }
-                else if (_selectedCollectionIndex >= 0)
-                {
-                    var area = _collectionAreas[_selectedCollectionIndex];
-                    ResizeArea(area, _resizeHandle, deltaImgX, deltaImgY);
-                    RefreshCollectionList();
-                }
-                _dragStart = e.Location;
-                _imagePanel.Invalidate();
-            }
-            else
-            {
-                // 新建区域
-                _dragEnd = e.Location;
-                _currentRect = GetRectangle(_dragStart, _dragEnd);
-                _imagePanel.Invalidate();
-            }
-        }
-
-        /// <summary>
-        /// 鼠标进入区域时检测并更新光标
-        /// </summary>
-        private void ImagePanel_MouseEnter(object sender, EventArgs e)
-        {
-            if (_screenshot == null) return;
-            var pos = _imagePanel.PointToClient(Cursor.Position);
-            UpdateCursorForResizeHandles(pos);
-        }
-
-        /// <summary>
-        /// 鼠标离开区域时恢复默认光标
-        /// </summary>
-        private void ImagePanel_MouseLeave(object sender, EventArgs e)
-        {
-            _imagePanel.Cursor = Cursors.Default;
-        }
-
-        /// <summary>
-        /// 鼠标滚轮缩放（手动缩放模式下有效）
-        /// </summary>
-        private void ImagePanel_MouseWheel(object sender, MouseEventArgs e)
-        {
-            if (_screenshot == null || _isAutoZoom) return;
-
-            // 计算缩放步进
-            float oldZoom = _zoomLevel;
-            if (e.Delta > 0)
-                _zoomLevel = Math.Min(MAX_ZOOM, _zoomLevel + ZOOM_STEP);
-            else
-                _zoomLevel = Math.Max(MIN_ZOOM, _zoomLevel - ZOOM_STEP);
-
-            if (Math.Abs(oldZoom - _zoomLevel) > 0.001f)
-            {
-                UpdateScrollSize();
-                _imagePanel.Invalidate();
-                UpdateZoomUI();
-            }
-        }
-
-        private void ImagePanel_MouseUp(object sender, MouseEventArgs e)
-        {
-            if (_screenshot == null) return;
-
-            // 结束平移（右键）
-            if (e.Button == MouseButtons.Right)
-            {
-                _isPanning = false;
-                _imagePanel.Cursor = Cursors.Default;
-                return;
-            }
-
-            if (!_isDragging) return;
-
-            // 如果是拖拽或缩放区域，结束操作
-            if (_isDraggingArea || _isResizingArea)
-            {
-                _isDraggingArea = false;
-                _isResizingArea = false;
-                _isDragging = false;
-                _resizeHandle = -1;
-                _imagePanel.Invalidate();
-                // 恢复默认光标
-                UpdateCursorForResizeHandles(e.Location);
-                return;
-            }
-
-            _dragEnd = e.Location;
-            _currentRect = GetRectangle(_dragStart, _dragEnd);
-
-            _isDragging = false;
-
-            // 确保矩形有效
-            if (_currentRect.Width > 10 && _currentRect.Height > 10)
-            {
-                // 弹出对话框确认区域属性
-                ShowAreaDialog(_currentRect);
-            }
-
-            _imagePanel.Invalidate();
-        }
-
-        private void ImagePanel_MouseClick(object sender, MouseEventArgs e)
-        {
-            if (_screenshot == null) return;
-
-            // 检查是否点击了已有区域
-            var clickPoint = e.Location;
-
-            // 转换面板坐标到图片坐标
-            var imgPoint = PanelToImage(clickPoint);
-            int imgX = imgPoint.X;
-            int imgY = imgPoint.Y;
-
-            // 检查检测区域
-            for (int i = 0; i < _verificationAreas.Count; i++)
-            {
-                var area = _verificationAreas[i];
-                var rect = new Rectangle(area.TopLeftX, area.TopLeftY, area.Width, area.Height);
-                if (rect.Contains(imgX, imgY))
-                {
-                    _selectedVerificationIndex = i;
-                    _selectedCollectionIndex = -1;
-                    SelectVerificationItem(i);
-                    _imagePanel.Invalidate();
-                    UpdateCursorForResizeHandles(clickPoint);
-                    return;
-                }
-            }
-
-            // 检查采集区域
-            for (int i = 0; i < _collectionAreas.Count; i++)
-            {
-                var area = _collectionAreas[i];
-                var rect = new Rectangle(area.TopLeftX, area.TopLeftY, area.Width, area.Height);
-                if (rect.Contains(imgX, imgY))
-                {
-                    _selectedCollectionIndex = i;
-                    _selectedVerificationIndex = -1;
-                    SelectCollectionItem(i);
-                    _imagePanel.Invalidate();
-                    UpdateCursorForResizeHandles(clickPoint);
-                    return;
-                }
-            }
-
-            // 点击空白区域，取消选择
-            _selectedVerificationIndex = -1;
-            _selectedCollectionIndex = -1;
-            _verificationListView.SelectedItems.Clear();
-            _collectionListView.SelectedItems.Clear();
-            _imagePanel.Invalidate();
-            UpdateCursorForResizeHandles(clickPoint);
-        }
-
-        private Rectangle GetRectangle(Point start, Point end)
-        {
-            int x = Math.Min(start.X, end.X);
-            int y = Math.Min(start.Y, end.Y);
-            int width = Math.Abs(end.X - start.X);
-            int height = Math.Abs(end.Y - start.Y);
-            return new Rectangle(x, y, width, height);
-        }
-
-        /// <summary>
-        /// 获取缩放后的区域矩形
-        /// </summary>
-        private Rectangle GetScaledRect(ImageVerificationArea area, float scaleX, float scaleY)
-        {
-            return new Rectangle(
-                (int)(area.TopLeftX * scaleX),
-                (int)(area.TopLeftY * scaleY),
-                (int)(area.Width * scaleX),
-                (int)(area.Height * scaleY));
-        }
-
-        private Rectangle GetScaledRect(ImageCollectionArea area, float scaleX, float scaleY)
-        {
-            return new Rectangle(
-                (int)(area.TopLeftX * scaleX),
-                (int)(area.TopLeftY * scaleY),
-                (int)(area.Width * scaleX),
-                (int)(area.Height * scaleY));
-        }
-
-        private int GetResizeHandle(Rectangle rect, Point point)
-        {
-            var rects = GetHandleRects(rect, 8);
-            for (int i = 0; i < rects.Length; i++)
-            {
-                if (rects[i].Contains(point))
-                    return i;
-            }
-            return -1;
-        }
-
-        /// <summary>
-        /// 缩放区域
-        /// </summary>
-        private void ResizeArea(ImageVerificationArea area, int handle, int deltaX, int deltaY)
-        {
-            switch (handle)
-            {
-                case 0: // 左上
-                    area.TopLeftX += deltaX;
-                    area.TopLeftY += deltaY;
-                    area.Width -= deltaX;
-                    area.Height -= deltaY;
-                    break;
-                case 1: // 上
-                    area.TopLeftY += deltaY;
-                    area.Height -= deltaY;
-                    break;
-                case 2: // 右上
-                    area.TopLeftY += deltaY;
-                    area.Width += deltaX;
-                    area.Height -= deltaY;
-                    break;
-                case 3: // 右
-                    area.Width += deltaX;
-                    break;
-                case 4: // 右下
-                    area.Width += deltaX;
-                    area.Height += deltaY;
-                    break;
-                case 5: // 下
-                    area.Height += deltaY;
-                    break;
-                case 6: // 左下
-                    area.TopLeftX += deltaX;
-                    area.Width -= deltaX;
-                    area.Height += deltaY;
-                    break;
-                case 7: // 左
-                    area.TopLeftX += deltaX;
-                    area.Width -= deltaX;
-                    break;
-            }
-            // 确保尺寸有效
-            if (area.Width < 10) area.Width = 10;
-            if (area.Height < 10) area.Height = 10;
-        }
-
-        private void ResizeArea(ImageCollectionArea area, int handle, int deltaX, int deltaY)
-        {
-            switch (handle)
-            {
-                case 0:
-                    area.TopLeftX += deltaX;
-                    area.TopLeftY += deltaY;
-                    area.Width -= deltaX;
-                    area.Height -= deltaY;
-                    break;
-                case 1:
-                    area.TopLeftY += deltaY;
-                    area.Height -= deltaY;
-                    break;
-                case 2:
-                    area.TopLeftY += deltaY;
-                    area.Width += deltaX;
-                    area.Height -= deltaY;
-                    break;
-                case 3:
-                    area.Width += deltaX;
-                    break;
-                case 4:
-                    area.Width += deltaX;
-                    area.Height += deltaY;
-                    break;
-                case 5:
-                    area.Height += deltaY;
-                    break;
-                case 6:
-                    area.TopLeftX += deltaX;
-                    area.Width -= deltaX;
-                    area.Height += deltaY;
-                    break;
-                case 7:
-                    area.TopLeftX += deltaX;
-                    area.Width -= deltaX;
-                    break;
-            }
-            if (area.Width < 10) area.Width = 10;
-            if (area.Height < 10) area.Height = 10;
-        }
-
-        /// <summary>
-        /// 双击编辑区域
-        /// </summary>
-        private void ImagePanel_MouseDoubleClick(object sender, MouseEventArgs e)
-        {
-            if (_screenshot == null) return;
-
-            // 检查是否点击了检测区域
-            for (int i = 0; i < _verificationAreas.Count; i++)
-            {
-                var area = _verificationAreas[i];
-                var panelRect = ImageToPanelRect(area);
-                if (panelRect.Contains(e.Location))
-                {
-                    EditVerificationArea(i);
-                    return;
-                }
-            }
-
-            // 检查是否点击了采集区域
-            for (int i = 0; i < _collectionAreas.Count; i++)
-            {
-                var area = _collectionAreas[i];
-                var panelRect = ImageToPanelRect(area);
-                if (panelRect.Contains(e.Location))
-                {
-                    EditCollectionArea(i);
-                    return;
-                }
-            }
-        }
-
-        /// <summary>
-        /// 键盘事件 - Delete 删除选中区域, Tab 切换检测/采集区域
-        /// </summary>
-        private void ImagePanel_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.KeyCode == Keys.Tab)
-            {
-                // 切换检测/采集模式
-                _isVerificationMode = !_isVerificationMode;
-
-                // 更新RadioButton状态
-                _radioVerification.Checked = _isVerificationMode;
-                _radioCollection.Checked = !_isVerificationMode;
-
-                e.Handled = true;
-            }
-            else if (e.KeyCode == Keys.Delete)
-            {
-                if (_selectedVerificationIndex >= 0)
-                {
-                    DeleteVerificationArea(_selectedVerificationIndex);
-                    e.Handled = true;
-                }
-                else if (_selectedCollectionIndex >= 0)
-                {
-                    DeleteCollectionArea(_selectedCollectionIndex);
-                    e.Handled = true;
-                }
-            }
-        }
-
-        /// <summary>
-        /// 编辑检测区域
-        /// </summary>
-        private void EditVerificationArea(int index)
-        {
-            if (index < 0 || index >= _verificationAreas.Count) return;
-
-            var area = _verificationAreas[index];
-            var dialog = new FormAreaDialog(true, area.MatchThreshold, Path.GetFileNameWithoutExtension(area.FileName), area.TopLeftX, area.TopLeftY, area.Width, area.Height);
-            dialog.ValidateName = name =>
-            {
-                if (IsVerificationNameDuplicate(name, index))
-                    return $"检测区域名称 \"{name}\" 已存在，请使用其他名称。";
-                return null;
-            };
-            if (dialog.ShowDialog() == DialogResult.OK)
-            {
-                area.TopLeftX = dialog.AreaX;
-                area.TopLeftY = dialog.AreaY;
-                area.Width = dialog.AreaWidth;
-                area.Height = dialog.AreaHeight;
-                area.FileName = dialog.AreaName + ".png";
-                area.MatchThreshold = dialog.MatchThreshold;
-                RefreshVerificationList();
-                _imagePanel.Invalidate();
-            }
-        }
-
-        /// <summary>
-        /// 编辑采集区域
-        /// </summary>
-        private void EditCollectionArea(int index)
-        {
-            if (index < 0 || index >= _collectionAreas.Count) return;
-
-            var area = _collectionAreas[index];
-            var dialog = new FormAreaDialog(false, 0.8f, area.Name, area.TopLeftX, area.TopLeftY, area.Width, area.Height);
-            dialog.ValidateName = name =>
-            {
-                if (IsCollectionNameDuplicate(name, index))
-                    return $"采集区域名称 \"{name}\" 已存在，请使用其他名称。";
-                return null;
-            };
-            if (dialog.ShowDialog() == DialogResult.OK)
-            {
-                area.TopLeftX = dialog.AreaX;
-                area.TopLeftY = dialog.AreaY;
-                area.Width = dialog.AreaWidth;
-                area.Height = dialog.AreaHeight;
-                area.Name = dialog.AreaName;
-                RefreshCollectionList();
-                _imagePanel.Invalidate();
-            }
-        }
-
-        #endregion
-
-        #region 区域对话框
-
-        private void ShowAreaDialog(Rectangle rect)
-        {
-            // 转换面板坐标到图片坐标
-            var topLeft = PanelToImage(new Point(rect.X, rect.Y));
-            var bottomRight = PanelToImage(new Point(rect.Right, rect.Bottom));
-
-            int imgX = Math.Min(topLeft.X, bottomRight.X);
-            int imgY = Math.Min(topLeft.Y, bottomRight.Y);
-            int imgWidth = Math.Abs(bottomRight.X - topLeft.X);
-            int imgHeight = Math.Abs(bottomRight.Y - topLeft.Y);
-
-            if (_isVerificationMode)
-            {
-                // 检测区域
-                string defaultName = $"检测区域{_verificationAreas.Count + 1}";
-                var dialog = new FormAreaDialog(true, _matchThreshold, defaultName, imgX, imgY, imgWidth, imgHeight);
-                dialog.ValidateName = name =>
-                {
-                    if (IsVerificationNameDuplicate(name))
-                        return $"检测区域名称 \"{name}\" 已存在，请使用其他名称。";
-                    return null;
-                };
-                if (dialog.ShowDialog() == DialogResult.OK)
-                {
-                    var area = new ImageVerificationArea
-                    {
-                        TopLeftX = imgX,
-                        TopLeftY = imgY,
-                        Width = imgWidth,
-                        Height = imgHeight,
-                        FileName = dialog.AreaName + ".png",
-                        MatchThreshold = dialog.MatchThreshold
-                    };
-                    _verificationAreas.Add(area);
-                    _isModify = true;
-
-                    // 保存检测区域截图
-                    SaveVerificationImage(area);
-
-                    RefreshVerificationList();
-                    _imagePanel.Invalidate();
-                    _statusLabel.Text = "已添加检测区域";
-                }
-            }
-            else
-            {
-                // 采集区域
-                string defaultName = $"采集区域{_collectionAreas.Count + 1}";
-                var dialog = new FormAreaDialog(false, _matchThreshold, defaultName, imgX, imgY, imgWidth, imgHeight);
-                dialog.ValidateName = name =>
-                {
-                    if (IsCollectionNameDuplicate(name))
-                        return $"采集区域名称 \"{name}\" 已存在，请使用其他名称。";
-                    return null;
-                };
-                if (dialog.ShowDialog() == DialogResult.OK)
-                {
-                    var area = new ImageCollectionArea
-                    {
-                        Name = dialog.AreaName,
-                        TopLeftX = imgX,
-                        TopLeftY = imgY,
-                        Width = imgWidth,
-                        Height = imgHeight
-                    };
-                    _collectionAreas.Add(area);
-                    _isModify = true;
-
-                    RefreshCollectionList();
-                    _imagePanel.Invalidate();
-                    _statusLabel.Text = "已添加采集区域";
-                }
-            }
-        }
-
-        private void SaveVerificationImage(ImageVerificationArea area)
-        {
-            try
-            {
-                var dataDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data");
-                if (!Directory.Exists(dataDir))
-                {
-                    Directory.CreateDirectory(dataDir);
-                }
-
-                var filePath = Path.Combine(dataDir, area.FileName);
-                var rect = new Rectangle(area.TopLeftX, area.TopLeftY, area.Width, area.Height);
-                using (var cropped = _screenshot.Clone(rect, _screenshot.PixelFormat))
-                {
-                    cropped.Save(filePath);
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"保存检测图片失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        #endregion
-
-        #region 绘制区域
-
-        private void ImagePanel_Paint(object sender, PaintEventArgs e)
-        {
-            if (_screenshot == null)
-            {
-                e.Graphics.Clear(Color.Black);
-                using (var font = new Font("Microsoft Sans Serif", 14))
-                using (var brush = new SolidBrush(Color.Gray))
-                {
-                    var text = "请点击\"重新截屏\"获取屏幕截图";
-                    var size = e.Graphics.MeasureString(text, font);
-                    var x = (_scrollContainer.ClientSize.Width - size.Width) / 2;
-                    var y = (_scrollContainer.ClientSize.Height - size.Height) / 2;
-                    e.Graphics.DrawString(text, font, brush, x, y);
-                }
-                return;
-            }
-
-            // 绘制截屏图片
-            e.Graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
-
-            // 计算缩放比例和绘制偏移
-            float scaleX = 1f, scaleY = 1f;
-            int areaOffsetX = 0, areaOffsetY = 0;
-
-            if (_isAutoZoom)
-            {
-                // 自动缩放模式：图片适应滚动容器
-                scaleX = (float)_scrollContainer.ClientSize.Width / _screenshot.Width;
-                scaleY = (float)_scrollContainer.ClientSize.Height / _screenshot.Height;
-                // 保持宽高比，取较小值
-                float minScale = Math.Min(scaleX, scaleY);
-                int drawW = (int)(_screenshot.Width * minScale);
-                int drawH = (int)(_screenshot.Height * minScale);
-                int ox = (_scrollContainer.ClientSize.Width - drawW) / 2;
-                int oy = (_scrollContainer.ClientSize.Height - drawH) / 2;
-                e.Graphics.DrawImage(_screenshot, ox, oy, drawW, drawH);
-                scaleX = minScale;
-                scaleY = minScale;
-                areaOffsetX = ox;
-                areaOffsetY = oy;
-            }
-            else
-            {
-                // 手动缩放模式：绘制缩放后的图片，滚动容器负责滚动
-                scaleX = _zoomLevel;
-                scaleY = _zoomLevel;
-                int drawWidth = (int)(_screenshot.Width * _zoomLevel);
-                int drawHeight = (int)(_screenshot.Height * _zoomLevel);
-                e.Graphics.DrawImage(_screenshot, 0, 0, drawWidth, drawHeight);
-            }
-
-            // 绘制检测区域（蓝色）
-            for (int i = 0; i < _verificationAreas.Count; i++)
-            {
-                var area = _verificationAreas[i];
-                int x = (int)(area.TopLeftX * scaleX) + areaOffsetX;
-                int y = (int)(area.TopLeftY * scaleY) + areaOffsetY;
-                var rect = new Rectangle(
-                    x,
-                    y,
-                    (int)(area.Width * scaleX),
-                    (int)(area.Height * scaleY));
-
-                var frontColor = i == _selectedVerificationIndex ? Color.Cyan : Color.LightSkyBlue;
-                var backColor = Color.FromArgb(200, Color.Black);
-                DrawArea(e.Graphics, rect, frontColor, backColor, "检测: " + Path.GetFileNameWithoutExtension(area.FileName), i == _selectedVerificationIndex);
-            }
-
-            // 绘制采集区域（橙色）
-            for (int i = 0; i < _collectionAreas.Count; i++)
-            {
-                var area = _collectionAreas[i];
-                int x = (int)(area.TopLeftX * scaleX) + areaOffsetX;
-                int y = (int)(area.TopLeftY * scaleY) + areaOffsetY;
-                var rect = new Rectangle(
-                    x,
-                    y,
-                    (int)(area.Width * scaleX),
-                    (int)(area.Height * scaleY));
-
-                var frontColor = i == _selectedCollectionIndex ? Color.Yellow : COLLECTION_COLOR;
-                var backColor = Color.FromArgb(200, Color.Black);
-                DrawArea(e.Graphics, rect, frontColor, backColor, area.Name, i == _selectedCollectionIndex);
-            }
-
-            // 绘制当前拖拽的矩形
-            if (_isDragging && _currentRect.Width > 0 && _currentRect.Height > 0)
-            {
-                var color = _isVerificationMode ? VERIFICATION_COLOR : COLLECTION_COLOR;
-                using (var pen = new Pen(color, 2))
-                using (var brush = new SolidBrush(Color.FromArgb(50, color)))
-                {
-                    e.Graphics.FillRectangle(brush, _currentRect);
-                    e.Graphics.DrawRectangle(pen, _currentRect);
-                }
-            }
-        }
-
-        private void DrawArea(Graphics g, Rectangle rect, Color frontColor, Color backColor, string label, bool isSelected)
-        {
-            using (var pen = new Pen(frontColor, 2))
-            using (var brush = new SolidBrush(Color.FromArgb(50, frontColor)))
-            using (var font = new Font("Microsoft Sans Serif", 8))
-            using (var textBrush = new SolidBrush(frontColor))
-            {
-                // 填充半透明背景
-                g.FillRectangle(brush, rect);
-                // 绘制边框
-                g.DrawRectangle(pen, rect);
-                // 绘制标签
-                var size = g.MeasureString(label, font);
-                g.FillRectangle(new SolidBrush(Color.FromArgb(200, backColor)),
-                    rect.X, rect.Y - (int)size.Height - 2, (int)size.Width + 4, (int)size.Height + 2);
-                g.DrawString(label, font, textBrush, rect.X + 2, rect.Y - (int)size.Height - 2);
-
-                // 如果是选中状态，绘制8个缩放手柄
-                if (isSelected)
-                {
-                    int handleSize = 8;
-                    using (var handleBrush = new SolidBrush(frontColor))
-                    using (var handlePen = new Pen(Color.White, 1))
-                    {
-                        foreach (var handleRect in GetHandleRects(rect, handleSize))
-                        {
-                            g.FillRectangle(handleBrush, handleRect);
-                            g.DrawRectangle(handlePen, handleRect);
-                        }
-                    }
-                }
-            }
-        }
-
-        /// <summary>
-        /// 根据手柄编号设置对应的鼠标光标
-        /// </summary>
-        private void SetCursorForHandle(int handle)
-        {
-            switch (handle)
-            {
-                case 0: // 左上
-                case 4: // 右下
-                    _imagePanel.Cursor = Cursors.SizeNWSE;
-                    break;
-                case 2: // 右上
-                case 6: // 左下
-                    _imagePanel.Cursor = Cursors.SizeNESW;
-                    break;
-                case 1: // 上
-                case 5: // 下
-                    _imagePanel.Cursor = Cursors.SizeNS;
-                    break;
-                case 3: // 右
-                case 7: // 左
-                    _imagePanel.Cursor = Cursors.SizeWE;
-                    break;
-                default:
-                    _imagePanel.Cursor = Cursors.Default;
-                    break;
-            }
-        }
-
-        /// <summary>
-        /// 检测鼠标位置是否在缩放手柄范围内，并更新鼠标光标
-        /// </summary>
-        private void UpdateCursorForResizeHandles(Point mousePos)
-        {
-            if (_screenshot == null) return;
-
-            // 检查检测区域
-            if (_selectedVerificationIndex >= 0)
-            {
-                var area = _verificationAreas[_selectedVerificationIndex];
-                var panelRect = ImageToPanelRect(area);
-                int handle = GetResizeHandle(panelRect, mousePos);
-                SetCursorForHandle(handle);
-                return;
-            }
-
-            // 检查采集区域
-            if (_selectedCollectionIndex >= 0)
-            {
-                var area = _collectionAreas[_selectedCollectionIndex];
-                var panelRect = ImageToPanelRect(area);
-                int handle = GetResizeHandle(panelRect, mousePos);
-                SetCursorForHandle(handle);
-                return;
-            }
-
-            _imagePanel.Cursor = Cursors.Default;
-        }
-
-        #endregion
-
-        #region 列表操作
-
-        private void RefreshVerificationList()
-        {
-            _verificationListView.Items.Clear();
-            for (int i = 0; i < _verificationAreas.Count; i++)
-            {
-                var area = _verificationAreas[i];
-                var item = new ListViewItem(Path.GetFileNameWithoutExtension(area.FileName));
-                item.SubItems.Add($"({area.TopLeftX}, {area.TopLeftY}, {area.Width}x{area.Height})");
-                item.SubItems.Add("×");
-                item.Tag = i;
-                _verificationListView.Items.Add(item);
-            }
-        }
-
-        private void RefreshCollectionList()
-        {
-            _collectionListView.Items.Clear();
-            for (int i = 0; i < _collectionAreas.Count; i++)
-            {
-                var area = _collectionAreas[i];
-                var item = new ListViewItem(area.Name);
-                item.SubItems.Add($"({area.TopLeftX}, {area.TopLeftY}, {area.Width}x{area.Height})");
-                item.SubItems.Add("×");
-                item.SubItems.Add(""); // OCR识别结果列
-                item.Tag = i;
-                _collectionListView.Items.Add(item);
-            }
-        }
-
-        private void VerificationListView_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            if (_verificationListView.SelectedItems.Count > 0)
-            {
-                _selectedVerificationIndex = (int)_verificationListView.SelectedItems[0].Tag;
-                _selectedCollectionIndex = -1;
-                _collectionListView.SelectedItems.Clear();
-                _imagePanel.Invalidate();
-            }
-        }
-
-        private void CollectionListView_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            if (_collectionListView.SelectedItems.Count > 0)
-            {
-                _selectedCollectionIndex = (int)_collectionListView.SelectedItems[0].Tag;
-                _selectedVerificationIndex = -1;
-                _verificationListView.SelectedItems.Clear();
-                _imagePanel.Invalidate();
-            }
-        }
-
-        private void SelectVerificationItem(int index)
-        {
-            foreach (ListViewItem item in _verificationListView.Items)
-            {
-                if ((int)item.Tag == index)
-                {
-                    item.Selected = true;
-                    break;
-                }
-            }
-        }
-
-        private void SelectCollectionItem(int index)
-        {
-            foreach (ListViewItem item in _collectionListView.Items)
-            {
-                if ((int)item.Tag == index)
-                {
-                    item.Selected = true;
-                    break;
-                }
-            }
-        }
-
-        #endregion
-
-        #region 单选按钮
-
-        private void RadioVerification_CheckedChanged(object sender, EventArgs e)
-        {
-            if (_radioVerification.Checked)
-            {
-                _isVerificationMode = true;
-            }
-        }
-
-        private void RadioCollection_CheckedChanged(object sender, EventArgs e)
-        {
-            if (_radioCollection.Checked)
-            {
-                _isVerificationMode = false;
-            }
-        }
-
-        #endregion
-
-        #region 配置保存/加载
-
-        private string GetDataDir()
-        {
-            return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data");
-        }
-
-        private string GetConfigPath()
-        {
-            return Path.Combine(GetDataDir(), "CaptureSettings.json");
-        }
-
-        private Image LoadIconFromResources(string resourcesDir, string fileName)
-        {
-            var path = Path.Combine(resourcesDir, fileName);
-            if (File.Exists(path))
-            {
-                byte[] data = File.ReadAllBytes(path);
-                return Image.FromStream(new MemoryStream(data));
-            }
-            return null;
-        }
-
-        private string GetScreenshotPath()
-        {
-            return Path.Combine(GetDataDir(), "screenshot.png");
-        }
-
-        private void DeleteOldConfig()
-        {
-            try
-            {
-                var configPath = GetConfigPath();
-                var screenshotPath = GetScreenshotPath();
-                var dataDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data");
-
-                // 删除配置文件
-                if (File.Exists(configPath))
-                {
-                    File.Delete(configPath);
-                }
-
-                // 删除截图文件
-                if (File.Exists(screenshotPath))
-                {
-                    File.Delete(screenshotPath);
-                }
-
-                // 删除 data 目录中的模板图片
-                if (Directory.Exists(dataDir))
-                {
-                    Directory.Delete(dataDir, true);
-                }
-
-                _statusLabel.Text = "已清除旧配置";
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"清除旧配置失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void LoadScreenshot(string path)
-        {
-            try
-            {
-                if (File.Exists(path))
-                {
-                    _screenshot?.Dispose();
-                    // 先从文件读取，然后用克隆创建新Bitmap以释放文件锁
-                    using (var tempBmp = new Bitmap(path))
-                    {
-                        _screenshot = new Bitmap(tempBmp);
-                    }
-                    UpdateScrollSize();
-                    _imagePanel.Invalidate();
-                    _statusLabel.Text = $"截图已加载: {_screenshot.Width}x{_screenshot.Height}";
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"加载截图失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void LoadConfig()
-        {
-            var configPath = GetConfigPath();
-            if (!File.Exists(configPath))
-            {
-                return;
-            }
-
-            try
-            {
-                var json = File.ReadAllText(configPath);
-                var config = Newtonsoft.Json.JsonConvert.DeserializeObject<CaptureSettings>(json);
-                if (config != null)
-                {
-                    _verificationAreas = config.VerificationAreas ?? new List<ImageVerificationArea>();
-                    _collectionAreas = config.CollectionAreas ?? new List<ImageCollectionArea>();
-                    _screenNumber = config.ScreenNumber;
-                    _ocrEngineComboBox.Text = config.OcrEngine ?? "PaddleOCR";
-
-                    // 检查屏幕编号是否越界
-                    var screens = Screen.AllScreens;
-                    if (_screenNumber >= screens.Length)
-                    {
-                        _screenNumber = 0;
-                    }
-
-                    // 加载截图
-                    var screenshotPath = GetScreenshotPath();
-                    if (File.Exists(screenshotPath))
-                    {
-                        LoadScreenshot(screenshotPath);
-                    }
-
-                    // 更新阈值下拉框
-                    for (int i = 0; i < _thresholdComboBox.Items.Count; i++)
-                    {
-                        if (_thresholdComboBox.Items[i].ToString() == _matchThreshold.ToString())
-                        {
-                            _thresholdComboBox.SelectedIndex = i;
-                            break;
-                        }
-                    }
-
-                    RefreshVerificationList();
-                    RefreshCollectionList();
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"加载配置失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void SaveConfig()
-        {
-            try
-            {
-                // 确保 data 目录存在
-                Directory.CreateDirectory(GetDataDir());
-
-                var screenshotPath = GetScreenshotPath();
-
-                // 保存截图
-                _screenshot?.Save(screenshotPath, System.Drawing.Imaging.ImageFormat.Png);
-
-                var config = new CaptureSettings
-                {
-                    VerificationAreas = _verificationAreas,
-                    CollectionAreas = _collectionAreas,
-                    ScreenNumber = _screenNumber,
-                    OcrEngine = _ocrEngineComboBox.Text
-                };
-
-                var json = Newtonsoft.Json.JsonConvert.SerializeObject(config, Newtonsoft.Json.Formatting.Indented);
-                File.WriteAllText(GetConfigPath(), json);
-                _statusLabel.Text = "配置已保存";
-                _isModify = false;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"保存配置失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        #endregion
-
-        #region 删除和绘制事件
-
-        private void VerificationListView_MouseClick(object sender, MouseEventArgs e)
-        {
-            var listView = sender as ListView;
-            if (listView == null) return;
-
-            var info = listView.HitTest(e.X, e.Y);
-            if (info.Item != null && info.SubItem != null)
-            {
-                // 点击删除列（第3列）
-                int deleteColumnIndex = 2;
-                int columnIndex = info.Item.SubItems.IndexOf(info.SubItem);
-                if (columnIndex == deleteColumnIndex)
-                {
-                    int index = (int)info.Item.Tag;
-                    DeleteVerificationArea(index);
-                }
-            }
-        }
-
-        private void CollectionListView_MouseClick(object sender, MouseEventArgs e)
-        {
-            var listView = sender as ListView;
-            if (listView == null) return;
-
-            var info = listView.HitTest(e.X, e.Y);
-            if (info.Item != null && info.SubItem != null)
-            {
-                // 点击删除列（第3列）
-                int deleteColumnIndex = 2;
-                int columnIndex = info.Item.SubItems.IndexOf(info.SubItem);
-                if (columnIndex == deleteColumnIndex)
-                {
-                    int index = (int)info.Item.Tag;
-                    DeleteCollectionArea(index);
-                }
-            }
-        }
-
-        private void VerificationListView_MouseDoubleClick(object sender, MouseEventArgs e)
-        {
-            var listView = sender as ListView;
-            if (listView == null || listView.SelectedItems.Count == 0) return;
-
-            int index = (int)listView.SelectedItems[0].Tag;
-            if (index >= 0 && index < _verificationAreas.Count)
-            {
-                EditVerificationArea(index);
-            }
-        }
-
-        private void CollectionListView_MouseDoubleClick(object sender, MouseEventArgs e)
-        {
-            var listView = sender as ListView;
-            if (listView == null || listView.SelectedItems.Count == 0) return;
-
-            int index = (int)listView.SelectedItems[0].Tag;
-            if (index >= 0 && index < _collectionAreas.Count)
-            {
-                EditCollectionArea(index);
-            }
-        }
-
-        private void DeleteVerificationArea(int index)
-        {
-            if (index >= 0 && index < _verificationAreas.Count)
-            {
-                var area = _verificationAreas[index];
-                var result = MessageBox.Show($"确定要删除检测区域 \"{Path.GetFileNameWithoutExtension(area.FileName)}\" 吗？",
-                    "确认删除", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                if (result == DialogResult.Yes)
-                {
-                    _verificationAreas.RemoveAt(index);
-                    _isModify = true;
-                    RefreshVerificationList();
-
-                    // 删除后重置选中索引
-                    if (_selectedVerificationIndex >= _verificationAreas.Count)
-                    {
-                        _selectedVerificationIndex = _verificationAreas.Count > 0 ? _verificationAreas.Count - 1 : -1;
-                    }
-
-                    _imagePanel.Invalidate();
-                    _statusLabel.Text = "检测区域已删除";
-                }
-            }
-        }
-
-        private void DeleteCollectionArea(int index)
-        {
-            if (index >= 0 && index < _collectionAreas.Count)
-            {
-                var area = _collectionAreas[index];
-                var result = MessageBox.Show($"确定要删除采集区域 \"{area.Name}\" 吗？",
-                    "确认删除", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                if (result == DialogResult.Yes)
-                {
-                    _collectionAreas.RemoveAt(index);
-                    _isModify = true;
-                    RefreshCollectionList();
-
-                    // 删除后重置选中索引
-                    if (_selectedCollectionIndex >= _collectionAreas.Count)
-                    {
-                        _selectedCollectionIndex = _collectionAreas.Count > 0 ? _collectionAreas.Count - 1 : -1;
-                    }
-
-                    _imagePanel.Invalidate();
-                    _statusLabel.Text = "采集区域已删除";
-                }
-            }
-        }
-
-        private void ListView_DrawColumnHeader(object sender, DrawListViewColumnHeaderEventArgs e)
-        {
-            e.DrawDefault = true;
-        }
-
-        private void VerificationListView_DrawSubItem(object sender, DrawListViewSubItemEventArgs e)
-        {
-            if (e.ColumnIndex == 2)
-            {
-                // 绘制删除按钮
-                e.DrawDefault = false;
-                var bounds = e.SubItem.Bounds;
-                using (var btnBrush = new SolidBrush(Color.FromArgb(220, 80, 80)))
-                {
-                    var btnRect = new Rectangle(bounds.Left + 2, bounds.Top + 2, bounds.Width - 4, bounds.Height - 4);
-                    e.Graphics.FillRectangle(btnBrush, btnRect);
-                    using (var pen = new Pen(Color.White, 1))
-                    {
-                        e.Graphics.DrawString("×", new Font("Microsoft Sans Serif", 9, FontStyle.Bold),
-                            Brushes.White, bounds.Left + 8, bounds.Top + 2);
-                    }
-                }
-            }
-            else
-            {
-                e.DrawDefault = true;
-            }
-        }
-
-        private void CollectionListView_DrawSubItem(object sender, DrawListViewSubItemEventArgs e)
-        {
-            if (e.ColumnIndex == 2)
-            {
-                // 绘制删除按钮
-                e.DrawDefault = false;
-                var bounds = e.SubItem.Bounds;
-                using (var btnBrush = new SolidBrush(Color.FromArgb(220, 80, 80)))
-                {
-                    var btnRect = new Rectangle(bounds.Left + 2, bounds.Top + 2, bounds.Width - 4, bounds.Height - 4);
-                    e.Graphics.FillRectangle(btnBrush, btnRect);
-                    using (var pen = new Pen(Color.White, 1))
-                    {
-                        e.Graphics.DrawString("×", new Font("Microsoft Sans Serif", 9, FontStyle.Bold),
-                            Brushes.White, bounds.Left + 8, bounds.Top + 2);
-                    }
-                }
-            }
-            else
-            {
-                e.DrawDefault = true;
-            }
-        }
-
-        /// <summary>
-        /// 捕获键盘事件 - 处理 Tab 键切换检测/采集区域
-        /// </summary>
-        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
-        {
-            if (keyData == Keys.Tab)
-            {
-                // 切换检测/采集模式
-                _isVerificationMode = !_isVerificationMode;
-
-                // 更新RadioButton状态
-                _radioVerification.Checked = _isVerificationMode;
-                _radioCollection.Checked = !_isVerificationMode;
-
-                // 切换选中区域
-                if (_isVerificationMode)
-                {
-                    if (_selectedVerificationIndex < 0 && _verificationAreas.Count > 0)
-                    {
-                        _selectedVerificationIndex = 0;
-                    }
-                    _selectedCollectionIndex = -1;
-                }
-                else
-                {
-                    if (_selectedCollectionIndex < 0 && _collectionAreas.Count > 0)
-                    {
-                        _selectedCollectionIndex = 0;
-                    }
-                    _selectedVerificationIndex = -1;
-                }
-
-                _imagePanel.Invalidate();
-                return true;
-            }
-
-            return base.ProcessCmdKey(ref msg, keyData);
-        }
-
-        #endregion
-
-        #region OCR功能
-
-        /// <summary>
-        /// 根据选中的索引创建对应的 OCR 服务实例
-        /// </summary>
-        /// <param name="engineIndex">0=PaddleOCR, 1=OpenCvSharp</param>
-        private IOcrService CreateOcrService(int engineIndex)
-        {
-            return engineIndex == 0
-                ? (IOcrService)new ScreenTextCollector.PaddleOCR.OcrService()
-                : (IOcrService)new ScreenTextCollector.OpenCvSharp.OcrService();
-        }
-
-        /// <summary>
-        /// 刷新采集列表中所有区域的 OCR 识别结果
-        /// </summary>
-        private bool RefreshCollectionListOcrResults()
-        {
-            if (_screenshot == null || _collectionAreas.Count == 0)
-            {
-                _statusLabel.Text = "没有截图或采集区域，无法执行 OCR 识别";
-                return false;
-            }
-
-            try
-            {
-                // 保存临时截图用于 OCR
-                var tempPath = Path.Combine(Path.GetTempPath(), "labeltool_ocr_temp.png");
-                _screenshot.Save(tempPath, System.Drawing.Imaging.ImageFormat.Png);
-
-                // 根据选中的引擎创建对应的 OcrService
-                IOcrService ocrService = CreateOcrService(_ocrEngineComboBox.SelectedIndex);
-
-                // 对每个采集区域执行 OCR
-                for (int i = 0; i < _collectionAreas.Count; i++)
-                {
-                    var area = _collectionAreas[i];
-                    string result = ocrService.PerformOcr(tempPath, area);
-
-                    // 更新 ListView OCR结果列（第4列，索引3）
-                    if (i < _collectionListView.Items.Count)
-                    {
-                        _collectionListView.Items[i].SubItems[3].Text = result;
-                    }
-                }
-
-                // 清理临时文件
-                try { File.Delete(tempPath); } catch { }
-
-                // 释放 OCR 服务资源
-                if (ocrService is IDisposable disposable)
-                {
-                    disposable.Dispose();
-                }
-            }
-            catch (Exception ex)
-            {
-                _statusLabel.Text = $"OCR识别失败: {ex.Message}";
-                return false;
-            }
-
-            return true;
-        }
-
-        #endregion
 
         protected override void Dispose(bool disposing)
         {
@@ -2300,4 +426,38 @@ namespace LabelTool
         }
     }
 
+    #region 区域边界类
+
+    /// <summary>
+    /// 区域边界抽象基类，用于统一 ImageVerificationArea 和 ImageCollectionArea 的边界操作
+    /// </summary>
+    internal abstract class AreaBounds
+    {
+        public abstract int TopLeftX { get; set; }
+        public abstract int TopLeftY { get; set; }
+        public abstract int Width { get; set; }
+        public abstract int Height { get; set; }
+    }
+
+    internal sealed class VerificationAreaAdapter : AreaBounds
+    {
+        private readonly ImageVerificationArea _area;
+        public VerificationAreaAdapter(ImageVerificationArea area) => _area = area;
+        public override int TopLeftX { get => _area.TopLeftX; set => _area.TopLeftX = value; }
+        public override int TopLeftY { get => _area.TopLeftY; set => _area.TopLeftY = value; }
+        public override int Width { get => _area.Width; set => _area.Width = value; }
+        public override int Height { get => _area.Height; set => _area.Height = value; }
+    }
+
+    internal sealed class CollectionAreaAdapter : AreaBounds
+    {
+        private readonly ImageCollectionArea _area;
+        public CollectionAreaAdapter(ImageCollectionArea area) => _area = area;
+        public override int TopLeftX { get => _area.TopLeftX; set => _area.TopLeftX = value; }
+        public override int TopLeftY { get => _area.TopLeftY; set => _area.TopLeftY = value; }
+        public override int Width { get => _area.Width; set => _area.Width = value; }
+        public override int Height { get => _area.Height; set => _area.Height = value; }
+    }
+
+    #endregion
 }
