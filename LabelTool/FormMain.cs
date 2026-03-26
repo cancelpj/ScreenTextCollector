@@ -48,6 +48,16 @@ namespace LabelTool
         private Color VERIFICATION_COLOR = Color.FromArgb(0, 0, 255); // 蓝色
         private Color COLLECTION_COLOR = Color.FromArgb(255, 128, 0); // 橙色
 
+        // 显示模式
+        private bool _isAutoZoom = true;           // 是否自动缩放模式
+        private float _zoomLevel = 1.0f;            // 缩放级别 (0.1 ~ 5.0)
+        private Point _lastMousePos;                // 上次鼠标位置（用于平移）
+        private Point _scrollOffset = Point.Empty;   // 滚动偏移量（直接追踪，避免抖动）
+        private bool _isPanning;                   // 是否正在平移
+        private const float MIN_ZOOM = 0.5f;        // 最小缩放
+        private const float MAX_ZOOM = 1.5f;       // 最大缩放
+        private const float ZOOM_STEP = 0.1f;      // 每次缩放步进
+
         // 控件
         private ToolStrip _toolStrip;
         private Panel _imagePanel;
@@ -73,13 +83,88 @@ namespace LabelTool
         private ToolStripLabel _ocrEngineLabel;
         private ToolStripComboBox _ocrEngineComboBox;
         private ToolStripButton _btnOcrTest;
+        private ToolStripComboBox _cmbZoomMode;
+        private ToolStripComboBox _cmbZoomLevel;
+        private ToolStripButton _btnZoomOut;
+        private TrackBar _zoomTrackBar;
+        private ToolStripControlHost _zoomTrackBarHost;
+        private ToolStripButton _btnZoomIn;
+        private Panel _scrollContainer;
 
         // 手柄偏移因子（相对于 rect.X/Y 的比例）：左上、上、右上、右、右下、下、左下、左
         // 每个元素的 (X,Y) 表示 rect.X + rect.Width * X, rect.Y + rect.Height * Y
         private static readonly float[] _handleFX = { 0f, 0.5f, 1f, 1f, 1f, 0.5f, 0f, 0f };
         private static readonly float[] _handleFY = { 0f, 0f, 0f, 0.5f, 1f, 1f, 1f, 0.5f };
-        private static readonly float[] _anchorFX = { 0f, 0.5f, 0f, 0f, 0f, 0.5f, 0f, 0f };
-        private static readonly float[] _anchorFY = { 0f, 0f, 0f, 0.5f, 0f, 0f, 0f, 0.5f };
+
+        /// <summary>
+        /// 获取图片在面板上的绘制偏移（考虑缩放和平移）
+        /// </summary>
+        private (float scaleX, float scaleY, float offsetX, float offsetY) GetImageTransform()
+        {
+            if (_screenshot == null)
+                return (1, 1, 0, 0);
+
+            if (_isAutoZoom)
+            {
+                float scale = Math.Min(
+                    (float)_scrollContainer.ClientSize.Width / _screenshot.Width,
+                    (float)_scrollContainer.ClientSize.Height / _screenshot.Height);
+                int drawW = (int)(_screenshot.Width * scale);
+                int drawH = (int)(_screenshot.Height * scale);
+                return (scale, scale,
+                    (_scrollContainer.ClientSize.Width - drawW) / 2f,
+                    (_scrollContainer.ClientSize.Height - drawH) / 2f);
+            }
+            else
+            {
+                return (_zoomLevel, _zoomLevel, 0, 0);
+            }
+        }
+
+        /// <summary>
+        /// 将面板坐标转换为图片坐标
+        /// </summary>
+        private Point PanelToImage(Point panelPoint)
+        {
+            var (scaleX, scaleY, offsetX, offsetY) = GetImageTransform();
+            int imgX = (int)((panelPoint.X - offsetX) / scaleX);
+            int imgY = (int)((panelPoint.Y - offsetY) / scaleY);
+            return new Point(imgX, imgY);
+        }
+
+        /// <summary>
+        /// 将图片坐标转换为面板坐标
+        /// </summary>
+        private Point ImageToPanel(int imgX, int imgY)
+        {
+            var (scaleX, scaleY, offsetX, offsetY) = GetImageTransform();
+            int panelX = (int)(imgX * scaleX + offsetX);
+            int panelY = (int)(imgY * scaleY + offsetY);
+            return new Point(panelX, panelY);
+        }
+
+        /// <summary>
+        /// 将图片区域转换为面板区域
+        /// </summary>
+        private Rectangle ImageToPanelRect(ImageVerificationArea area)
+        {
+            var (scaleX, scaleY, offsetX, offsetY) = GetImageTransform();
+            return new Rectangle(
+                (int)(area.TopLeftX * scaleX + offsetX),
+                (int)(area.TopLeftY * scaleY + offsetY),
+                (int)(area.Width * scaleX),
+                (int)(area.Height * scaleY));
+        }
+
+        private Rectangle ImageToPanelRect(ImageCollectionArea area)
+        {
+            var (scaleX, scaleY, offsetX, offsetY) = GetImageTransform();
+            return new Rectangle(
+                (int)(area.TopLeftX * scaleX + offsetX),
+                (int)(area.TopLeftY * scaleY + offsetY),
+                (int)(area.Width * scaleX),
+                (int)(area.Height * scaleY));
+        }
 
         /// <summary>
         /// 根据基准矩形和手柄大小，计算 8 个手柄的 Rectangle（左上→顺时针→左）
@@ -270,6 +355,7 @@ namespace LabelTool
         private void InitializeComponent()
         {
             this._toolStrip = new System.Windows.Forms.ToolStrip();
+            this._scrollContainer = new Panel();
             this._imagePanel = new System.Windows.Forms.Panel();
             // 启用双缓冲，减少闪烁
             this._imagePanel.GetType().GetProperty("DoubleBuffered",
@@ -342,6 +428,49 @@ namespace LabelTool
             this._toolStrip.Items.Add(toolStripSeparator3);
             this._toolStrip.Items.Add(this._btnOcrTest);
 
+            // 缩放控制
+            var toolStripSeparator4 = new ToolStripSeparator();
+            this._cmbZoomMode = new ToolStripComboBox();
+            this._cmbZoomMode.DropDownStyle = ComboBoxStyle.DropDownList;
+            this._cmbZoomMode.Items.AddRange(new object[] { "自动缩放", "手动缩放" });
+            this._cmbZoomMode.SelectedIndex = 0; // 默认自动缩放
+            this._cmbZoomMode.SelectedIndexChanged += CmbZoomMode_SelectedIndexChanged;
+            this._cmbZoomLevel = new ToolStripComboBox();
+            this._cmbZoomLevel.DropDownStyle = ComboBoxStyle.DropDown;
+            this._cmbZoomLevel.Items.AddRange(new object[] { "50%", "75%", "100%", "125%", "150%" });
+            this._cmbZoomLevel.SelectedIndex = 2; // 默认100%
+            this._cmbZoomLevel.TextChanged += CmbZoomLevel_TextChanged;
+            this._cmbZoomLevel.KeyDown += CmbZoomLevel_KeyDown;
+            this._btnZoomOut = new ToolStripButton("-", null, BtnZoomOut_Click);
+            this._btnZoomOut.ToolTipText = "缩小";
+            this._zoomTrackBar = new TrackBar
+            {
+                TickStyle = TickStyle.None,
+                AutoSize = false,
+                Height = 20,
+                Width = 100,
+                Minimum = (int)(MIN_ZOOM * 100),
+                Maximum = (int)(MAX_ZOOM * 100),
+                Value = 100,
+                Enabled = false
+            };
+            // TrackBar 垂直居中（ToolStrip 高度约25）
+            this._zoomTrackBar.Top = (_toolStrip.Height - _zoomTrackBar.Height) / 2;
+            this._zoomTrackBar.Scroll += ZoomTrackBar_Scroll;
+            this._zoomTrackBarHost = new ToolStripControlHost(_zoomTrackBar);
+            this._zoomTrackBarHost.Padding = Padding.Empty;
+            this._zoomTrackBarHost.Margin = new Padding(2, 0, 2, 0);
+            this._btnZoomIn = new ToolStripButton("+", null, BtnZoomIn_Click);
+            this._btnZoomIn.ToolTipText = "放大";
+
+            this._toolStrip.Items.Add(toolStripSeparator4);
+            this._toolStrip.Items.Add(this._cmbZoomMode);
+            this._toolStrip.Items.Add(new ToolStripSeparator());
+            this._toolStrip.Items.Add(this._cmbZoomLevel);
+            this._toolStrip.Items.Add(this._btnZoomOut);
+            this._toolStrip.Items.Add(this._zoomTrackBarHost);
+            this._toolStrip.Items.Add(this._btnZoomIn);
+
             // 垂直SplitContainer（左侧图片，右侧列表）
             this._verticalSplit = new SplitContainer
             {
@@ -351,9 +480,15 @@ namespace LabelTool
                 BorderStyle = BorderStyle.FixedSingle
             };
 
-            // ImagePanel
+            // ImagePanel 和滚动容器
+            this._scrollContainer = new Panel
+            {
+                Dock = DockStyle.Fill,
+                AutoScroll = true,
+                AutoScrollMinSize = new Size(1, 1),
+                BackColor = Color.Black
+            };
             this._imagePanel.BackColor = Color.Black;
-            this._imagePanel.Dock = DockStyle.Fill;
             this._imagePanel.Name = "_imagePanel";
             this._imagePanel.Size = new Size(698, 398);
             this._imagePanel.TabIndex = 0;
@@ -365,6 +500,7 @@ namespace LabelTool
             this._imagePanel.MouseDoubleClick += ImagePanel_MouseDoubleClick;
             this._imagePanel.MouseEnter += ImagePanel_MouseEnter;
             this._imagePanel.MouseLeave += ImagePanel_MouseLeave;
+            this._imagePanel.MouseWheel += ImagePanel_MouseWheel;
             this._imagePanel.KeyDown += ImagePanel_KeyDown;
             this._imagePanel.TabIndex = 0;
             this._imagePanel.TabStop = true;
@@ -373,7 +509,8 @@ namespace LabelTool
             this._listPanel.Dock = DockStyle.Fill;
             this._listPanel.Name = "_listPanel";
 
-            this._verticalSplit.Panel1.Controls.Add(this._imagePanel);
+            this._scrollContainer.Controls.Add(this._imagePanel);
+            this._verticalSplit.Panel1.Controls.Add(this._scrollContainer);
             this._verticalSplit.Panel2.Controls.Add(this._listPanel);
 
             // 不再需要水平SplitContainer，直接使用垂直SplitContainer
@@ -607,6 +744,109 @@ namespace LabelTool
             _btnOcrTest.Enabled = true;
         }
 
+        private void CmbZoomMode_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            _isAutoZoom = (_cmbZoomMode.SelectedIndex == 0);
+            if (!_isAutoZoom)
+            {
+                _zoomLevel = 1.0f;
+                UpdateScrollSize();
+            }
+            _imagePanel.Invalidate();
+            UpdateZoomUI();
+        }
+
+        private bool _isUpdatingZoomLevel; // 防止 TextChanged 回环
+
+        private void CmbZoomLevel_TextChanged(object sender, EventArgs e)
+        {
+            if (_isAutoZoom || _screenshot == null || _isUpdatingZoomLevel) return;
+
+            string text = _cmbZoomLevel.Text.TrimEnd('%', ' ');
+            if (float.TryParse(text, out float percent))
+            {
+                float newZoom = Math.Max(MIN_ZOOM, Math.Min(MAX_ZOOM, percent / 100f));
+                if (Math.Abs(_zoomLevel - newZoom) > 0.001f)
+                {
+                    _zoomLevel = newZoom;
+                    UpdateScrollSize();
+                    _imagePanel.Invalidate();
+                    // 同步 TrackBar（避免重新触发 TextChanged）
+                    UpdateTrackBarOnly();
+                }
+            }
+        }
+
+        private void CmbZoomLevel_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                _cmbZoomLevel.Focus(); // 触发 TextChanged
+            }
+        }
+
+        private void UpdateScrollSize()
+        {
+            // 更新滚动容器的内容尺寸（不触发重绘，由调用方决定何时刷新）
+            if (_screenshot == null) return;
+            int w = (int)(_screenshot.Width * _zoomLevel);
+            int h = (int)(_screenshot.Height * _zoomLevel);
+            _imagePanel.Size = new Size(w, h);
+            _scrollContainer.AutoScrollMinSize = new Size(w, h);
+        }
+
+        private void BtnZoomIn_Click(object sender, EventArgs e)
+        {
+            if (_isAutoZoom) return;
+            _zoomLevel = Math.Min(MAX_ZOOM, _zoomLevel + ZOOM_STEP);
+            UpdateScrollSize();
+            _imagePanel.Invalidate();
+            UpdateZoomUI();
+        }
+
+        private void BtnZoomOut_Click(object sender, EventArgs e)
+        {
+            if (_isAutoZoom) return;
+            _zoomLevel = Math.Max(MIN_ZOOM, _zoomLevel - ZOOM_STEP);
+            UpdateScrollSize();
+            _imagePanel.Invalidate();
+            UpdateZoomUI();
+        }
+
+        private void ZoomTrackBar_Scroll(object sender, EventArgs e)
+        {
+            if (_isAutoZoom) return;
+            // 将拖动条位置转换为缩放值
+            _zoomLevel = _zoomTrackBar.Value / 100f;
+            UpdateScrollSize();
+            _imagePanel.Invalidate();
+            UpdateZoomUI();
+        }
+
+        private void UpdateTrackBarOnly()
+        {
+            // 将缩放值转换为拖动条位置
+            _zoomTrackBar.Value = (int)(_zoomLevel * 100);
+        }
+
+        private void UpdateZoomUI()
+        {
+            // 更新缩放显示
+            int percent = (int)(_zoomLevel * 100);
+            _isUpdatingZoomLevel = true;
+            _cmbZoomLevel.Text = percent + "%";
+            _isUpdatingZoomLevel = false;
+
+            // 将缩放值转换为拖动条位置 (0.1-5.0 -> 0-100)
+            UpdateTrackBarOnly();
+
+            // 启用/禁用控件
+            _btnZoomIn.Enabled = !_isAutoZoom && _zoomLevel < MAX_ZOOM;
+            _btnZoomOut.Enabled = !_isAutoZoom && _zoomLevel > MIN_ZOOM;
+            _zoomTrackBar.Enabled = !_isAutoZoom;
+            _cmbZoomLevel.Enabled = !_isAutoZoom;
+        }
+
         #endregion
 
         #region 截屏功能
@@ -663,6 +903,7 @@ namespace LabelTool
                     _toolTip.Active = true;
                 }
 
+                UpdateScrollSize();
                 _imagePanel.Invalidate();
                 _statusLabel.Text = $"截屏完成: {_screenshot.Width}x{_screenshot.Height}";
             }
@@ -684,8 +925,17 @@ namespace LabelTool
             // 聚焦到图片面板以接收键盘事件
             _imagePanel.Focus();
 
-            float scaleX = (float)_imagePanel.Width / _screenshot.Width;
-            float scaleY = (float)_imagePanel.Height / _screenshot.Height;
+            // 鼠标右键开始平移（手动缩放模式）
+            if (e.Button == MouseButtons.Right && !_isAutoZoom)
+            {
+                _isPanning = true;
+                _scrollOffset = new Point(-_scrollContainer.AutoScrollPosition.X, -_scrollContainer.AutoScrollPosition.Y);
+                _lastMousePos = e.Location;
+                _imagePanel.Cursor = Cursors.Hand;
+                return;
+            }
+
+            var (scaleX, scaleY, offsetX, offsetY) = GetImageTransform();
 
             // 确保选中索引有效
             if (_selectedVerificationIndex >= _verificationAreas.Count)
@@ -697,8 +947,8 @@ namespace LabelTool
             if (_selectedVerificationIndex >= 0)
             {
                 var area = _verificationAreas[_selectedVerificationIndex];
-                var rect = GetScaledRect(area, scaleX, scaleY);
-                int handle = GetResizeHandle(rect, e.Location);
+                var panelRect = ImageToPanelRect(area);
+                int handle = GetResizeHandle(panelRect, e.Location);
 
                 if (handle >= 0)
                 {
@@ -706,7 +956,7 @@ namespace LabelTool
                     _isResizingArea = true;
                     _resizeHandle = handle;
                 }
-                else if (rect.Contains(e.Location))
+                else if (panelRect.Contains(e.Location))
                 {
                     // 点击了区域内部，开始拖拽移动
                     _isDraggingArea = true;
@@ -715,15 +965,15 @@ namespace LabelTool
             else if (_selectedCollectionIndex >= 0)
             {
                 var area = _collectionAreas[_selectedCollectionIndex];
-                var rect = GetScaledRect(area, scaleX, scaleY);
-                int handle = GetResizeHandle(rect, e.Location);
+                var panelRect = ImageToPanelRect(area);
+                int handle = GetResizeHandle(panelRect, e.Location);
 
                 if (handle >= 0)
                 {
                     _isResizingArea = true;
                     _resizeHandle = handle;
                 }
-                else if (rect.Contains(e.Location))
+                else if (panelRect.Contains(e.Location))
                 {
                     _isDraggingArea = true;
                 }
@@ -733,8 +983,7 @@ namespace LabelTool
             {
                 _dragStart = e.Location;
                 _isDragging = true;
-                // 拖拽时设置移动光标
-                _imagePanel.Cursor = _isResizingArea ? Cursors.SizeAll : Cursors.SizeAll;
+                _imagePanel.Cursor = Cursors.SizeAll;
             }
             else
             {
@@ -748,8 +997,20 @@ namespace LabelTool
         {
             if (_screenshot == null) return;
 
-            float scaleX = (float)_imagePanel.Width / _screenshot.Width;
-            float scaleY = (float)_imagePanel.Height / _screenshot.Height;
+            // 平移（使用滚动条实现）
+            if (_isPanning)
+            {
+                int dx = e.Location.X - _lastMousePos.X;
+                int dy = e.Location.Y - _lastMousePos.Y;
+                // 直接累加偏移量，避免 AutoScrollPosition 读写不对称导致的抖动
+                _scrollOffset.X += dx;
+                _scrollOffset.Y += dy;
+                _scrollContainer.AutoScrollPosition = _scrollOffset;
+                _lastMousePos = e.Location;
+                return;
+            }
+
+            var (scaleX, scaleY, offsetX, offsetY) = GetImageTransform();
             int deltaImgX = (int)((e.Location.X - _dragStart.X) / scaleX);
             int deltaImgY = (int)((e.Location.Y - _dragStart.Y) / scaleY);
 
@@ -820,9 +1081,41 @@ namespace LabelTool
             _imagePanel.Cursor = Cursors.Default;
         }
 
+        /// <summary>
+        /// 鼠标滚轮缩放（手动缩放模式下有效）
+        /// </summary>
+        private void ImagePanel_MouseWheel(object sender, MouseEventArgs e)
+        {
+            if (_screenshot == null || _isAutoZoom) return;
+
+            // 计算缩放步进
+            float oldZoom = _zoomLevel;
+            if (e.Delta > 0)
+                _zoomLevel = Math.Min(MAX_ZOOM, _zoomLevel + ZOOM_STEP);
+            else
+                _zoomLevel = Math.Max(MIN_ZOOM, _zoomLevel - ZOOM_STEP);
+
+            if (Math.Abs(oldZoom - _zoomLevel) > 0.001f)
+            {
+                UpdateScrollSize();
+                _imagePanel.Invalidate();
+                UpdateZoomUI();
+            }
+        }
+
         private void ImagePanel_MouseUp(object sender, MouseEventArgs e)
         {
-            if (_screenshot == null || !_isDragging) return;
+            if (_screenshot == null) return;
+
+            // 结束平移（右键）
+            if (e.Button == MouseButtons.Right)
+            {
+                _isPanning = false;
+                _imagePanel.Cursor = Cursors.Default;
+                return;
+            }
+
+            if (!_isDragging) return;
 
             // 如果是拖拽或缩放区域，结束操作
             if (_isDraggingArea || _isResizingArea)
@@ -859,11 +1152,10 @@ namespace LabelTool
             // 检查是否点击了已有区域
             var clickPoint = e.Location;
 
-            // 缩放比例
-            float scaleX = (float)_imagePanel.Width / _screenshot.Width;
-            float scaleY = (float)_imagePanel.Height / _screenshot.Height;
-            int imgX = (int)(clickPoint.X / scaleX);
-            int imgY = (int)(clickPoint.Y / scaleY);
+            // 转换面板坐标到图片坐标
+            var imgPoint = PanelToImage(clickPoint);
+            int imgX = imgPoint.X;
+            int imgY = imgPoint.Y;
 
             // 检查检测区域
             for (int i = 0; i < _verificationAreas.Count; i++)
@@ -1044,15 +1336,12 @@ namespace LabelTool
         {
             if (_screenshot == null) return;
 
-            float scaleX = (float)_imagePanel.Width / _screenshot.Width;
-            float scaleY = (float)_imagePanel.Height / _screenshot.Height;
-
             // 检查是否点击了检测区域
             for (int i = 0; i < _verificationAreas.Count; i++)
             {
                 var area = _verificationAreas[i];
-                var rect = GetScaledRect(area, scaleX, scaleY);
-                if (rect.Contains(e.Location))
+                var panelRect = ImageToPanelRect(area);
+                if (panelRect.Contains(e.Location))
                 {
                     EditVerificationArea(i);
                     return;
@@ -1063,8 +1352,8 @@ namespace LabelTool
             for (int i = 0; i < _collectionAreas.Count; i++)
             {
                 var area = _collectionAreas[i];
-                var rect = GetScaledRect(area, scaleX, scaleY);
-                if (rect.Contains(e.Location))
+                var panelRect = ImageToPanelRect(area);
+                if (panelRect.Contains(e.Location))
                 {
                     EditCollectionArea(i);
                     return;
@@ -1164,14 +1453,14 @@ namespace LabelTool
 
         private void ShowAreaDialog(Rectangle rect)
         {
-            // 缩放比例（图片控件坐标 -> 图片真实坐标）
-            float scaleX = (float)_screenshot.Width / _imagePanel.Width;
-            float scaleY = (float)_screenshot.Height / _imagePanel.Height;
+            // 转换面板坐标到图片坐标
+            var topLeft = PanelToImage(new Point(rect.X, rect.Y));
+            var bottomRight = PanelToImage(new Point(rect.Right, rect.Bottom));
 
-            int imgX = (int)(rect.X * scaleX);
-            int imgY = (int)(rect.Y * scaleY);
-            int imgWidth = (int)(rect.Width * scaleX);
-            int imgHeight = (int)(rect.Height * scaleY);
+            int imgX = Math.Min(topLeft.X, bottomRight.X);
+            int imgY = Math.Min(topLeft.Y, bottomRight.Y);
+            int imgWidth = Math.Abs(bottomRight.X - topLeft.X);
+            int imgHeight = Math.Abs(bottomRight.Y - topLeft.Y);
 
             if (_isVerificationMode)
             {
@@ -1274,28 +1563,56 @@ namespace LabelTool
                 {
                     var text = "请点击\"重新截屏\"获取屏幕截图";
                     var size = e.Graphics.MeasureString(text, font);
-                    var x = (_imagePanel.Width - size.Width) / 2;
-                    var y = (_imagePanel.Height - size.Height) / 2;
+                    var x = (_scrollContainer.ClientSize.Width - size.Width) / 2;
+                    var y = (_scrollContainer.ClientSize.Height - size.Height) / 2;
                     e.Graphics.DrawString(text, font, brush, x, y);
                 }
                 return;
             }
 
-            // 绘制截屏图片（缩放以适应面板）
+            // 绘制截屏图片
             e.Graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
-            e.Graphics.DrawImage(_screenshot, 0, 0, _imagePanel.Width, _imagePanel.Height);
 
-            // 计算缩放比例
-            float scaleX = (float)_imagePanel.Width / _screenshot.Width;
-            float scaleY = (float)_imagePanel.Height / _screenshot.Height;
+            // 计算缩放比例和绘制偏移
+            float scaleX = 1f, scaleY = 1f;
+            int areaOffsetX = 0, areaOffsetY = 0;
+
+            if (_isAutoZoom)
+            {
+                // 自动缩放模式：图片适应滚动容器
+                scaleX = (float)_scrollContainer.ClientSize.Width / _screenshot.Width;
+                scaleY = (float)_scrollContainer.ClientSize.Height / _screenshot.Height;
+                // 保持宽高比，取较小值
+                float minScale = Math.Min(scaleX, scaleY);
+                int drawW = (int)(_screenshot.Width * minScale);
+                int drawH = (int)(_screenshot.Height * minScale);
+                int ox = (_scrollContainer.ClientSize.Width - drawW) / 2;
+                int oy = (_scrollContainer.ClientSize.Height - drawH) / 2;
+                e.Graphics.DrawImage(_screenshot, ox, oy, drawW, drawH);
+                scaleX = minScale;
+                scaleY = minScale;
+                areaOffsetX = ox;
+                areaOffsetY = oy;
+            }
+            else
+            {
+                // 手动缩放模式：绘制缩放后的图片，滚动容器负责滚动
+                scaleX = _zoomLevel;
+                scaleY = _zoomLevel;
+                int drawWidth = (int)(_screenshot.Width * _zoomLevel);
+                int drawHeight = (int)(_screenshot.Height * _zoomLevel);
+                e.Graphics.DrawImage(_screenshot, 0, 0, drawWidth, drawHeight);
+            }
 
             // 绘制检测区域（蓝色）
             for (int i = 0; i < _verificationAreas.Count; i++)
             {
                 var area = _verificationAreas[i];
+                int x = (int)(area.TopLeftX * scaleX) + areaOffsetX;
+                int y = (int)(area.TopLeftY * scaleY) + areaOffsetY;
                 var rect = new Rectangle(
-                    (int)(area.TopLeftX * scaleX),
-                    (int)(area.TopLeftY * scaleY),
+                    x,
+                    y,
                     (int)(area.Width * scaleX),
                     (int)(area.Height * scaleY));
 
@@ -1308,9 +1625,11 @@ namespace LabelTool
             for (int i = 0; i < _collectionAreas.Count; i++)
             {
                 var area = _collectionAreas[i];
+                int x = (int)(area.TopLeftX * scaleX) + areaOffsetX;
+                int y = (int)(area.TopLeftY * scaleY) + areaOffsetY;
                 var rect = new Rectangle(
-                    (int)(area.TopLeftX * scaleX),
-                    (int)(area.TopLeftY * scaleY),
+                    x,
+                    y,
                     (int)(area.Width * scaleX),
                     (int)(area.Height * scaleY));
 
@@ -1367,14 +1686,6 @@ namespace LabelTool
         }
 
         /// <summary>
-        /// 获取8个缩放手柄的位置
-        /// </summary>
-        private Rectangle[] GetHandlePositions(Rectangle rect, int handleSize)
-        {
-            return GetHandleRects(rect, handleSize);
-        }
-
-        /// <summary>
         /// 根据手柄编号设置对应的鼠标光标
         /// </summary>
         private void SetCursorForHandle(int handle)
@@ -1410,15 +1721,12 @@ namespace LabelTool
         {
             if (_screenshot == null) return;
 
-            float scaleX = (float)_imagePanel.Width / _screenshot.Width;
-            float scaleY = (float)_imagePanel.Height / _screenshot.Height;
-
             // 检查检测区域
             if (_selectedVerificationIndex >= 0)
             {
                 var area = _verificationAreas[_selectedVerificationIndex];
-                var rect = GetScaledRect(area, scaleX, scaleY);
-                int handle = GetResizeHandle(rect, mousePos);
+                var panelRect = ImageToPanelRect(area);
+                int handle = GetResizeHandle(panelRect, mousePos);
                 SetCursorForHandle(handle);
                 return;
             }
@@ -1427,8 +1735,8 @@ namespace LabelTool
             if (_selectedCollectionIndex >= 0)
             {
                 var area = _collectionAreas[_selectedCollectionIndex];
-                var rect = GetScaledRect(area, scaleX, scaleY);
-                int handle = GetResizeHandle(rect, mousePos);
+                var panelRect = ImageToPanelRect(area);
+                int handle = GetResizeHandle(panelRect, mousePos);
                 SetCursorForHandle(handle);
                 return;
             }
@@ -1611,6 +1919,7 @@ namespace LabelTool
                     {
                         _screenshot = new Bitmap(tempBmp);
                     }
+                    UpdateScrollSize();
                     _imagePanel.Invalidate();
                     _statusLabel.Text = $"截图已加载: {_screenshot.Width}x{_screenshot.Height}";
                 }
@@ -1638,6 +1947,7 @@ namespace LabelTool
                     _verificationAreas = config.VerificationAreas ?? new List<ImageVerificationArea>();
                     _collectionAreas = config.CollectionAreas ?? new List<ImageCollectionArea>();
                     _screenNumber = config.ScreenNumber;
+                    _ocrEngineComboBox.Text = config.OcrEngine ?? "PaddleOCR";
 
                     // 检查屏幕编号是否越界
                     var screens = Screen.AllScreens;
@@ -1689,7 +1999,8 @@ namespace LabelTool
                 {
                     VerificationAreas = _verificationAreas,
                     CollectionAreas = _collectionAreas,
-                    ScreenNumber = _screenNumber
+                    ScreenNumber = _screenNumber,
+                    OcrEngine = _ocrEngineComboBox.Text
                 };
 
                 var json = Newtonsoft.Json.JsonConvert.SerializeObject(config, Newtonsoft.Json.Formatting.Indented);
