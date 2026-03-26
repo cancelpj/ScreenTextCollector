@@ -444,7 +444,7 @@ namespace LabelTool
             if (index < 0 || index >= _collectionAreas.Count) return;
 
             var area = _collectionAreas[index];
-            var dialog = new FormAreaDialog(false, 0.8f, area.Name, area.TopLeftX, area.TopLeftY, area.Width, area.Height);
+            var dialog = new FormAreaDialog(false, 0.8f, area.Name, area.TopLeftX, area.TopLeftY, area.Width, area.Height, area.Topic);
             dialog.ValidateName = name =>
             {
                 if (IsCollectionNameDuplicate(name, index))
@@ -458,6 +458,7 @@ namespace LabelTool
                 area.Width = dialog.AreaWidth;
                 area.Height = dialog.AreaHeight;
                 area.Name = dialog.AreaName;
+                area.Topic = dialog.Topic;
                 RefreshCollectionList();
                 _imagePanel.Invalidate();
             }

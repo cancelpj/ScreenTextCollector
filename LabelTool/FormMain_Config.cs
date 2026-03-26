@@ -74,7 +74,8 @@ namespace LabelTool
                         TopLeftX = imgX,
                         TopLeftY = imgY,
                         Width = imgWidth,
-                        Height = imgHeight
+                        Height = imgHeight,
+                        Topic = dialog.Topic
                     };
                     _collectionAreas.Add(area);
                     _isModify = true;

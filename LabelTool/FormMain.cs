@@ -10,7 +10,7 @@ namespace LabelTool
 {
     public partial class FormMain : Form
     {
-        private const string Title = "截屏采集标注工具 V1.3";
+        private const string Title = "截屏采集标注工具 V1.4";
 
         // 截屏图片
         private Bitmap _screenshot;

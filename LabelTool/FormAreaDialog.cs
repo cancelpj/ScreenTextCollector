@@ -7,7 +7,9 @@ namespace LabelTool
     {
         private Label _lblName;
         private Label _lblThreshold;
+        private Label _lblTopic;
         private TextBox _nameTextBox;
+        private TextBox _topicTextBox;
         private NumericUpDown _thresholdNumeric;
         private Button _btnOk;
         private Button _btnCancel;
@@ -28,6 +30,7 @@ namespace LabelTool
         public int AreaY { get; private set; }
         public int AreaWidth { get; private set; }
         public int AreaHeight { get; private set; }
+        public string Topic { get; private set; }
 
         /// <summary>
         /// 名称验证回调。传入当前输入的名称，返回错误提示文本；返回 null 表示验证通过。
@@ -38,14 +41,14 @@ namespace LabelTool
         /// 新建区域
         /// </summary>
         public FormAreaDialog(bool isVerificationMode, float defaultThreshold) :
-            this(isVerificationMode, defaultThreshold, "", 0, 0, 100, 100)
+            this(isVerificationMode, defaultThreshold, "", 0, 0, 100, 100, "")
         {
         }
 
         /// <summary>
         /// 编辑已有区域
         /// </summary>
-        public FormAreaDialog(bool isVerificationMode, float defaultThreshold, string areaName, int x, int y, int width, int height)
+        public FormAreaDialog(bool isVerificationMode, float defaultThreshold, string areaName, int x, int y, int width, int height, string topic = "")
         {
             AreaX = x;
             AreaY = y;
@@ -68,6 +71,10 @@ namespace LabelTool
                 // 采集区域不需要匹配阈值
                 _lblThreshold.Visible = false;
                 _thresholdNumeric.Visible = false;
+                // 设置 Topic（采集区域模式下显示）
+                _lblTopic.Visible = true;
+                _topicTextBox.Visible = true;
+                _topicTextBox.Text = topic ?? "";
             }
             else
             {
@@ -86,6 +93,8 @@ namespace LabelTool
             this._btnCancel = new System.Windows.Forms.Button();
             this._lblName = new System.Windows.Forms.Label();
             this._lblThreshold = new System.Windows.Forms.Label();
+            this._lblTopic = new System.Windows.Forms.Label();
+            this._topicTextBox = new System.Windows.Forms.TextBox();
 
             // 坐标和尺寸标签和输入框
             this._lblX = new System.Windows.Forms.Label();
@@ -112,6 +121,7 @@ namespace LabelTool
             int row3Y = 90;
             int row4Y = 125;
             int row5Y = 160;
+            int row6Y = 195;
 
             // 区域名称
             this._lblName.AutoSize = true;
@@ -196,21 +206,36 @@ namespace LabelTool
             this._thresholdNumeric.TabIndex = 6;
             this._thresholdNumeric.Value = new decimal(new int[] { 80, 0, 0, 131072 });
 
+            // MQTT Topic（仅采集区域显示）
+            this._lblTopic.AutoSize = true;
+            this._lblTopic.Location = new System.Drawing.Point(startX, row5Y + 3);
+            this._lblTopic.Name = "_lblTopic";
+            this._lblTopic.Size = new System.Drawing.Size(65, 12);
+            this._lblTopic.TabIndex = 7;
+            this._lblTopic.Text = "MQTT Topic:";
+            this._lblTopic.Visible = false;
+
+            this._topicTextBox.Location = new System.Drawing.Point(startX + labelWidth, row5Y);
+            this._topicTextBox.Name = "_topicTextBox";
+            this._topicTextBox.Size = new System.Drawing.Size(200, 21);
+            this._topicTextBox.TabIndex = 8;
+            this._topicTextBox.Visible = false;
+
             // 按钮
             this._btnOk.DialogResult = System.Windows.Forms.DialogResult.None;
-            this._btnOk.Location = new System.Drawing.Point(startX + 80, row5Y);
+            this._btnOk.Location = new System.Drawing.Point(startX + 80, row6Y);
             this._btnOk.Name = "_btnOk";
             this._btnOk.Size = new System.Drawing.Size(75, 25);
-            this._btnOk.TabIndex = 7;
+            this._btnOk.TabIndex = 9;
             this._btnOk.Text = "确定";
             this._btnOk.UseVisualStyleBackColor = true;
             this._btnOk.Click += this.BtnOK_Click;
 
             this._btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            this._btnCancel.Location = new System.Drawing.Point(startX + 165, row5Y);
+            this._btnCancel.Location = new System.Drawing.Point(startX + 165, row6Y);
             this._btnCancel.Name = "_btnCancel";
             this._btnCancel.Size = new System.Drawing.Size(75, 25);
-            this._btnCancel.TabIndex = 8;
+            this._btnCancel.TabIndex = 10;
             this._btnCancel.Text = "取消";
             this._btnCancel.UseVisualStyleBackColor = true;
             this._btnCancel.Click += this.BtnCancel_Click;
@@ -220,7 +245,7 @@ namespace LabelTool
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 12F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.CancelButton = this._btnCancel;
-            this.ClientSize = new System.Drawing.Size(340, 250);
+            this.ClientSize = new System.Drawing.Size(340, 290);
             this.Controls.Add(this._btnCancel);
             this.Controls.Add(this._btnOk);
             this.Controls.Add(this._numericHeight);
@@ -233,6 +258,8 @@ namespace LabelTool
             this.Controls.Add(this._lblX);
             this.Controls.Add(this._thresholdNumeric);
             this.Controls.Add(this._lblThreshold);
+            this.Controls.Add(this._topicTextBox);
+            this.Controls.Add(this._lblTopic);
             this.Controls.Add(this._nameTextBox);
             this.Controls.Add(this._lblName);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
@@ -281,6 +308,7 @@ namespace LabelTool
             AreaY = (int)_numericY.Value;
             AreaWidth = (int)_numericWidth.Value;
             AreaHeight = (int)_numericHeight.Value;
+            Topic = _topicTextBox.Visible ? _topicTextBox.Text.Trim() : null;
 
             this.DialogResult = DialogResult.OK;
             this.Close();

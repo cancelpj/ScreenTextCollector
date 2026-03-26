@@ -38,35 +38,50 @@ namespace ScreenTextCollector
 
                     while (!cancellationToken.IsCancellationRequested)
                     {
-                        string payloadJson;
-                        var ret = ScreenTextCollect();
-                        if (ret.ResultType == MethodResultType.Success)
-                        {
-                            var data = JsonConvert.DeserializeObject<Dictionary<string, string>>(ret.Message);
-                            var telemetry = new Dictionary<string, object>
-                            {
-                                { "CLIENT", mqttBrokerConfig.ClientId },
-                                { "DEVICECODE", Tool.Settings.DeviceName },
-                                { "EQUIPMENT", Tool.Settings.DeviceName },
-                                { "GROUPCODE", mqttBrokerConfig.GroupCode },
-                                { "TIMESTAMP", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }
-                            };
-                            foreach (var item in data)
-                            {
-                                telemetry.Add(item.Key, item.Value);
-                            }
+                        var collectRet = Tool.ProcessScreenCaptureWithTopic(
+                            Tool.GetScreenCapture().Message,
+                            OcrService.VerifyImage,
+                            OcrService.PerformOcr);
 
-                            payloadJson = JsonConvert.SerializeObject(telemetry);
+                        // 连接 MQTT
+                        MqttConnect(_mqttClient, mqttBrokerConfig.Ip, mqttBrokerConfig.Port, cancellationToken);
+
+                        if (collectRet.ResultType == MethodResultType.Success)
+                        {
+                            // 按 Topic 分组
+                            var groupedData = GroupByTopic(collectRet.Data.Data, collectRet.Data.TopicMap, mqttBrokerConfig.Topic);
+
+                            foreach (var group in groupedData)
+                            {
+                                string topic = group.Key;
+                                var data = group.Value;
+
+                                // 构建遥测数据
+                                var telemetry = new Dictionary<string, object>
+                                {
+                                    { "CLIENT", mqttBrokerConfig.ClientId },
+                                    { "DEVICECODE", Tool.Settings.DeviceName },
+                                    { "EQUIPMENT", Tool.Settings.DeviceName },
+                                    { "GROUPCODE", mqttBrokerConfig.GroupCode },
+                                    { "TIMESTAMP", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }
+                                };
+                                foreach (var item in data)
+                                {
+                                    telemetry[item.Key] = item.Value;
+                                }
+
+                                string payloadJson = JsonConvert.SerializeObject(telemetry);
+                                _mqttClient.Publish(topic, payloadJson);
+                                Tool.Log.Info($"{DateTime.Now} 发布 MQTT 消息到 [{topic}]: {payloadJson}\n");
+                            }
                         }
                         else
                         {
-                            payloadJson = ret.Message;
+                            // 非成功结果，使用全局 Topic 发送原始消息
+                            string payloadJson = collectRet.Message;
+                            _mqttClient.Publish(mqttBrokerConfig.Topic, payloadJson);
+                            Tool.Log.Warn($"{DateTime.Now} 采集异常，发布到 [{mqttBrokerConfig.Topic}]: {payloadJson}\n");
                         }
-
-                        MqttConnect(_mqttClient, mqttBrokerConfig.Ip, mqttBrokerConfig.Port, cancellationToken);
-                        //_mqttClient.Connect(mqttBrokerConfig.Ip, mqttBrokerConfig.Port, 30, true);
-                        _mqttClient.Publish(mqttBrokerConfig.Topic, payloadJson);
-                        Tool.Log.Info($"{DateTime.Now} 发布 MQTT 消息: {payloadJson}\n");
 
                         // 使用 WaitOne 实现可中断的等待
                         // 每秒检查一次取消信号，允许快速响应退出请求
@@ -102,6 +117,37 @@ namespace ScreenTextCollector
             {
                 Tool.Log.Warn("配置文件中缺少必要的 MQTT 配置项。");
             }
+        }
+
+        /// <summary>
+        /// 按 Topic 分组采集数据
+        /// </summary>
+        /// <param name="data">采集结果数据</param>
+        /// <param name="topicMap">区域名称到自定义 Topic 的映射</param>
+        /// <param name="defaultTopic">默认全局 Topic</param>
+        /// <returns>按 Topic 分组的结果（Topic -> 数据字典）</returns>
+        private static Dictionary<string, Dictionary<string, string>> GroupByTopic(
+            Dictionary<string, string> data,
+            Dictionary<string, string> topicMap,
+            string defaultTopic)
+        {
+            var result = new Dictionary<string, Dictionary<string, string>>();
+
+            foreach (var item in data)
+            {
+                string topic = !string.IsNullOrEmpty(item.Key) && topicMap.TryGetValue(item.Key, out var customTopic)
+                    ? customTopic ?? defaultTopic
+                    : defaultTopic;
+
+                if (!result.TryGetValue(topic, out var group))
+                {
+                    group = new Dictionary<string, string>();
+                    result[topic] = group;
+                }
+                group[item.Key] = item.Value;
+            }
+
+            return result;
         }
 
         private static void MqttConnect(MqttClient mqttClient, string mqttServerIp, int mqttServerPort, CancellationToken cancellationToken)

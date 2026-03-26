@@ -12,6 +12,22 @@ using System.Windows.Forms;
 
 namespace PluginInterface
 {
+    /// <summary>
+    /// 采集结果封装类
+    /// </summary>
+    public class CollectionResult
+    {
+        /// <summary>
+        /// 采集结果数据（区域名称 -> OCR 识别结果）
+        /// </summary>
+        public Dictionary<string, string> Data { get; set; }
+
+        /// <summary>
+        /// Topic 映射（区域名称 -> 自定义 MQTT Topic）
+        /// </summary>
+        public Dictionary<string, string> TopicMap { get; set; }
+    }
+
     public static class Tool
     {
         /// <summary>
@@ -118,40 +134,62 @@ namespace PluginInterface
         public static MethodResult ProcessScreenCapture(string screenShotPath, Func<string, List<ImageVerificationArea>, bool> verifyImage,
             Func<string, ImageCollectionArea, string> performOcr)
         {
+            var ret = ProcessScreenCaptureWithTopic(screenShotPath, verifyImage, performOcr);
+            if (ret.ResultType == MethodResultType.Success)
+            {
+                return new MethodResult(JsonConvert.SerializeObject(ret.Data.Data), MethodResultType.Success);
+            }
+            return new MethodResult(ret.Message, ret.ResultType);
+        }
+
+        /// <summary>
+        /// 处理屏幕截图，返回包含 Topic 映射的采集结果
+        /// </summary>
+        /// <param name="screenShotPath">屏幕截图文件路径</param>
+        /// <param name="verifyImage">图像校验委托</param>
+        /// <param name="performOcr">OCR识别委托</param>
+        /// <returns>采集结果，包含数据字典和 Topic 映射</returns>
+        public static MethodResult<CollectionResult> ProcessScreenCaptureWithTopic(string screenShotPath,
+            Func<string, List<ImageVerificationArea>, bool> verifyImage,
+            Func<string, ImageCollectionArea, string> performOcr)
+        {
             try
             {
                 // 图像校验
                 if (!verifyImage(screenShotPath, CaptureSettings.VerificationAreas))
                 {
                     File.Delete(screenShotPath);
-                    return new MethodResult("未监测到程序画面", MethodResultType.Warning);
+                    return new MethodResult<CollectionResult>("未监测到程序画面", MethodResultType.Warning);
                 }
 
                 // 图像采集
                 var data = new ConcurrentDictionary<string, string>();
+                var topicMap = new ConcurrentDictionary<string, string>();
                 Parallel.ForEach(CaptureSettings.CollectionAreas, area =>
                 {
-                    var text = performOcr(screenShotPath, area);
-                    data[area.Name] = text;
+                    data[area.Name] = performOcr(screenShotPath, area);
+                    if (!string.IsNullOrEmpty(area.Topic))
+                        topicMap[area.Name] = area.Topic;
                 });
 
                 // 保存本地日志
                 if (Settings.CsvRecord)
-                {
                     SaveToCsv(data);
-                }
 
                 // 汇总结果
                 File.Delete(screenShotPath);
-                var result = JsonConvert.SerializeObject(data);
-                Log.Info("识别结果：{0}", result);
-                return new MethodResult(result, MethodResultType.Success);
+                var result = new CollectionResult
+                {
+                    Data = new Dictionary<string, string>(data),
+                    TopicMap = new Dictionary<string, string>(topicMap)
+                };
+                Log.Info("识别结果：{0}", JsonConvert.SerializeObject(result.Data));
+                return new MethodResult<CollectionResult>(result, MethodResultType.Success.ToString(), MethodResultType.Success);
             }
             catch (Exception ex)
             {
-                //File.Delete(screenShotPath);
                 Log.Error(ex, "处理截屏失败");
-                return new MethodResult("处理截屏失败", ex);
+                return new MethodResult<CollectionResult>("处理截屏失败", ex);
             }
         }
 

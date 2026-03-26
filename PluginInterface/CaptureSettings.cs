@@ -106,5 +106,11 @@ namespace PluginInterface
         /// 高斯模糊核大小，必须是奇数，推荐 3
         /// </summary>
         public int GaussianBlurKernelSize { get; set; } = 3;
+
+        /// <summary>
+        /// 自定义 MQTT 推送主题（可选）
+        /// 如果设置，则该采集项的结果会发布到此主题，优先级高于全局 Topic
+        /// </summary>
+        public string Topic { get; set; }
     }
 }

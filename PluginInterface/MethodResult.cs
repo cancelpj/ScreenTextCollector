@@ -33,6 +33,42 @@ namespace PluginInterface
         }
     }
 
+    /// <summary>
+    /// 泛型方法结果封装
+    /// </summary>
+    /// <typeparam name="T">结果数据类型</typeparam>
+    public class MethodResult<T> : MethodResult
+    {
+        public T Data { get; set; }
+
+        public MethodResult()
+        {
+            Data = default;
+        }
+
+        public MethodResult(T data)
+        {
+            Data = data;
+            ResultType = MethodResultType.Success;
+            Message = string.Empty;
+        }
+
+        public MethodResult(string message, MethodResultType resultType) : base(message, resultType)
+        {
+            Data = default;
+        }
+
+        public MethodResult(string message, Exception exception) : base(message, exception)
+        {
+            Data = default;
+        }
+
+        public MethodResult(T data, string message, MethodResultType resultType) : base(message, resultType)
+        {
+            Data = data;
+        }
+    }
+
     public enum MethodResultType
     {
         Success,
