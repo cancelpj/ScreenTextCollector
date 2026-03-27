@@ -45,10 +45,10 @@ namespace LabelTool
                     var area = _collectionAreas[i];
                     string result = ocrService.PerformOcr(tempPath, area);
 
-                    // 更新 ListView OCR结果列（第4列，索引3）
-                    if (i < _collectionListView.Items.Count)
+                    // 更新 DataGridView OCR结果列（第3列，索引2）
+                    if (i < _collectionDataGridView.Rows.Count)
                     {
-                        _collectionListView.Items[i].SubItems[3].Text = result;
+                        _collectionDataGridView.Rows[i].Cells[2].Value = result;
                     }
                 }
 

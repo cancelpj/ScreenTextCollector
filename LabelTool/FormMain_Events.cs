@@ -1,4 +1,5 @@
 using System;
+using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
 
@@ -101,5 +102,131 @@ namespace LabelTool
             // 更新状态栏
             _statusLabel.Text = "就绪";
         }
+
+        #region DataGridView 事件处理
+
+        // 点击"..."按钮打开详情弹窗
+        private void CollectionDataGridView_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.ColumnIndex == 3 && e.RowIndex >= 0) // 展开按钮列（第4列）
+            {
+                string fullText = _collectionDataGridView.Rows[e.RowIndex].Cells[2].Value?.ToString() ?? ""; // 识别结果列（第3列）
+                ShowOcrResultDialog(fullText);
+            }
+        }
+
+        // 鼠标进入单元格时设置 Tooltip
+        private void CollectionDataGridView_CellMouseEnter(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.ColumnIndex == 2 && e.RowIndex >= 0) // 识别结果列（第3列）
+            {
+                string text = _collectionDataGridView.Rows[e.RowIndex].Cells[2].Value?.ToString() ?? "";
+                if (!string.IsNullOrEmpty(text))
+                {
+                    _collectionDataGridView.Rows[e.RowIndex].Cells[2].ToolTipText = text;
+                }
+            }
+        }
+
+        // 自定义绘制删除按钮（红色背景）
+        private void CollectionDataGridView_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
+        {
+            // 仅处理删除列（第5列，索引4）
+            if (e.ColumnIndex == 4 && e.RowIndex >= 0)
+            {
+                e.PaintBackground(e.CellBounds, true);
+                using (var brush = new SolidBrush(Color.FromArgb(220, 60, 60)))  // 红色背景
+                {
+                    var rect = e.CellBounds;
+                    rect.Inflate(-2, -2);  // 按钮与单元格边缘留点间距
+                    e.Graphics.FillRectangle(brush, rect);
+                }
+                using (var pen = new Pen(Color.FromArgb(180, 40, 40), 1))  // 深红色边框
+                {
+                    var rect = e.CellBounds;
+                    rect.Inflate(-2, -2);
+                    e.Graphics.DrawRectangle(pen, rect);
+                }
+                // 绘制"×"文字（白色）
+                using (var whiteBrush = new SolidBrush(Color.White))
+                using (var font = new Font("Microsoft YaHei UI", 9, FontStyle.Bold))
+                {
+                    var sf = new StringFormat
+                    {
+                        Alignment = StringAlignment.Center,
+                        LineAlignment = StringAlignment.Center
+                    };
+                    e.Graphics.DrawString("×", font, whiteBrush, e.CellBounds, sf);
+                }
+                e.Handled = true;
+            }
+        }
+
+        // 点击删除按钮或行选择
+        private void CollectionDataGridView_MouseClick(object sender, MouseEventArgs e)
+        {
+            var hit = _collectionDataGridView.HitTest(e.X, e.Y);
+            if (hit.Type == DataGridViewHitTestType.Cell && hit.RowIndex >= 0)
+            {
+                // 点击删除列（第5列，索引4）
+                if (hit.ColumnIndex == 4)
+                {
+                    int index = hit.RowIndex;
+                    if (index >= 0 && index < _collectionAreas.Count)
+                    {
+                        _collectionAreas.RemoveAt(index);
+                        RefreshCollectionList();
+                        _isModify = true;
+                    }
+                }
+                // 点击行时选中
+                else if (hit.ColumnIndex >= 0 && hit.ColumnIndex <= 3)
+                {
+                    _selectedCollectionIndex = (int)_collectionDataGridView.Rows[hit.RowIndex].Tag;
+                    _selectedVerificationIndex = -1;
+                    _verificationListView.SelectedItems.Clear();
+                    _imagePanel.Invalidate();
+                }
+            }
+        }
+
+        // 显示 OCR 结果详情弹窗
+        private void ShowOcrResultDialog(string text)
+        {
+            using (var dialog = new Form())
+            {
+                dialog.Text = "OCR 识别结果";
+                dialog.StartPosition = FormStartPosition.CenterParent;
+                dialog.Size = new Size(500, 300);
+                dialog.MinimumSize = new Size(300, 200);
+
+                var textBox = new TextBox
+                {
+                    Multiline = true,
+                    ReadOnly = true,
+                    ScrollBars = ScrollBars.Both,
+                    Text = text,
+                    Dock = DockStyle.Fill,
+                    Font = new Font("Consolas", 10)
+                };
+
+                var buttonPanel = new Panel { Dock = DockStyle.Bottom, Height = 40 };
+                var copyButton = new Button { Text = "复制到剪贴板", Top = 5, Left = 10, AutoSize = true };
+                copyButton.Click += (s, ev) =>
+                {
+                    Clipboard.SetText(text);
+                    copyButton.Text = "已复制!";
+                    System.Threading.Tasks.Task.Delay(1000).ContinueWith(_ =>
+                        BeginInvoke(new Action(() => copyButton.Text = "复制到剪贴板")));
+                };
+                buttonPanel.Controls.Add(copyButton);
+
+                dialog.Controls.Add(textBox);
+                dialog.Controls.Add(buttonPanel);
+                dialog.ShowDialog();
+            }
+        }
+
+        #endregion
     }
 }

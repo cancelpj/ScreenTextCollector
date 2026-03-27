@@ -10,7 +10,7 @@ namespace LabelTool
 {
     public partial class FormMain : Form
     {
-        private const string Title = "截屏采集标注工具 V1.4";
+        private const string Title = "截屏采集标注工具 V1.4.1";
 
         // 截屏图片
         private Bitmap _screenshot;
@@ -69,7 +69,7 @@ namespace LabelTool
         private GroupBox _verificationGroup;
         private GroupBox _collectionGroup;
         private ListView _verificationListView;
-        private ListView _collectionListView;
+        private DataGridView _collectionDataGridView;
         private StatusStrip _statusStrip;
         private ToolStripStatusLabel _statusLabel;
         private ToolStripSeparator _toolStripSeparator1;
@@ -304,7 +304,7 @@ namespace LabelTool
                 MultiSelect = false,
                 OwnerDraw = true
             };
-            _verificationListView.Columns.Add("名称", 80);
+            _verificationListView.Columns.Add("名称", 100);
             _verificationListView.Columns.Add("位置", 150);
             _verificationListView.Columns.Add("", 30);
             _verificationListView.SelectedIndexChanged += VerificationListView_SelectedIndexChanged;
@@ -323,26 +323,69 @@ namespace LabelTool
             _collectionGroup.Text = "采集区域";
             _collectionGroup.Height = 300;
 
-            // Collection ListView
-            _collectionListView = new ListView
+            // Collection DataGridView
+            _collectionDataGridView = new DataGridView
             {
                 Dock = DockStyle.Fill,
-                FullRowSelect = true,
-                GridLines = true,
-                View = View.Details,
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                ReadOnly = true,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
                 MultiSelect = false,
-                OwnerDraw = true
+                RowHeadersVisible = false,
+                ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
+                BackgroundColor = Color.White,
+                BorderStyle = BorderStyle.None,
+                ColumnHeadersVisible = true,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
+                ScrollBars = ScrollBars.Vertical
             };
-            _collectionListView.Columns.Add("名称", 80);
-            _collectionListView.Columns.Add("位置", 150);
-            _collectionListView.Columns.Add("", 30);
-            _collectionListView.Columns.Add("识别结果", 200);
-            _collectionListView.SelectedIndexChanged += CollectionListView_SelectedIndexChanged;
-            _collectionListView.MouseClick += CollectionListView_MouseClick;
-            _collectionListView.MouseDoubleClick += CollectionListView_MouseDoubleClick;
-            _collectionListView.DrawColumnHeader += ListView_DrawColumnHeader;
-            _collectionListView.DrawSubItem += CollectionListView_DrawSubItem;
-            _collectionGroup.Controls.Add(_collectionListView);
+
+            // 添加列：名称、位置、识别结果、展开按钮、删除
+            // 最小宽度计算：名称(50) + 位置(60) + 展开(30) + 删除(30) = 170px
+            var nameColumn = new DataGridViewTextBoxColumn
+            {
+                HeaderText = "名称",
+                Width = 100,
+                ReadOnly = true
+            };
+            var locationColumn = new DataGridViewTextBoxColumn
+            {
+                HeaderText = "位置",
+                Width = 120,
+                ReadOnly = true
+            };
+            var resultColumn = new DataGridViewTextBoxColumn
+            {
+                HeaderText = "识别结果",
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill  // 自动填充剩余空间
+            };
+            var expandColumn = new DataGridViewButtonColumn
+            {
+                HeaderText = "",
+                Width = 30,
+                UseColumnTextForButtonValue = true,
+                Text = "...",
+                FlatStyle = FlatStyle.Popup,
+                Resizable = DataGridViewTriState.False
+            };
+            var deleteColumn = new DataGridViewButtonColumn
+            {
+                HeaderText = "",
+                Width = 30,
+                UseColumnTextForButtonValue = true,
+                Text = "×",
+                FlatStyle = FlatStyle.Popup,
+                Resizable = DataGridViewTriState.False
+            };
+
+            _collectionDataGridView.Columns.AddRange(nameColumn, locationColumn, resultColumn, expandColumn, deleteColumn);
+            _collectionDataGridView.CellPainting += CollectionDataGridView_CellPainting;  // 自定义绘制删除按钮
+            _collectionDataGridView.CellContentClick += CollectionDataGridView_CellContentClick;
+            _collectionDataGridView.CellMouseEnter += CollectionDataGridView_CellMouseEnter;
+            _collectionDataGridView.SelectionChanged += (s, e) => { _collectionDataGridView.ClearSelection(); };
+            _collectionDataGridView.MouseClick += CollectionDataGridView_MouseClick;
+            _collectionGroup.Controls.Add(_collectionDataGridView);
 
             // Radio buttons
             _radioVerificationArea.AutoSize = true;

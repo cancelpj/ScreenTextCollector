@@ -284,7 +284,7 @@ namespace LabelTool
             _selectedVerificationIndex = -1;
             _selectedCollectionIndex = -1;
             _verificationListView.SelectedItems.Clear();
-            _collectionListView.SelectedItems.Clear();
+            _collectionDataGridView.ClearSelection();
             _imagePanel.Invalidate();
             UpdateCursorForResizeHandles(clickPoint);
         }

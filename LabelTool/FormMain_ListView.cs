@@ -24,16 +24,18 @@ namespace LabelTool
 
         private void RefreshCollectionList()
         {
-            _collectionListView.Items.Clear();
+            _collectionDataGridView.Rows.Clear();
             for (int i = 0; i < _collectionAreas.Count; i++)
             {
                 var area = _collectionAreas[i];
-                var item = new ListViewItem(area.Name);
-                item.SubItems.Add($"({area.TopLeftX}, {area.TopLeftY}, {area.Width}x{area.Height})");
-                item.SubItems.Add("×");
-                item.SubItems.Add(""); // OCR识别结果列
-                item.Tag = i;
-                _collectionListView.Items.Add(item);
+                int rowIndex = _collectionDataGridView.Rows.Add();
+                var row = _collectionDataGridView.Rows[rowIndex];
+                row.Cells[0].Value = area.Name;
+                row.Cells[1].Value = $"({area.TopLeftX}, {area.TopLeftY}, {area.Width}x{area.Height})";
+                row.Cells[2].Value = ""; // OCR 识别结果
+                row.Cells[3].Value = ""; // 展开按钮（列定义已有 Text="..."）
+                row.Cells[4].Value = ""; // 删除按钮（使用自定义绘制）
+                row.Tag = i;
             }
         }
 
@@ -43,20 +45,14 @@ namespace LabelTool
             {
                 _selectedVerificationIndex = (int)_verificationListView.SelectedItems[0].Tag;
                 _selectedCollectionIndex = -1;
-                _collectionListView.SelectedItems.Clear();
+                _collectionDataGridView.ClearSelection();
                 _imagePanel.Invalidate();
             }
         }
 
         private void CollectionListView_SelectedIndexChanged(object sender, EventArgs e)
         {
-            if (_collectionListView.SelectedItems.Count > 0)
-            {
-                _selectedCollectionIndex = (int)_collectionListView.SelectedItems[0].Tag;
-                _selectedVerificationIndex = -1;
-                _verificationListView.SelectedItems.Clear();
-                _imagePanel.Invalidate();
-            }
+            // DataGridView 使用 SelectionChanged 事件，此方法保留兼容
         }
 
         private void SelectVerificationItem(int index)
@@ -73,11 +69,11 @@ namespace LabelTool
 
         private void SelectCollectionItem(int index)
         {
-            foreach (ListViewItem item in _collectionListView.Items)
+            for (int i = 0; i < _collectionDataGridView.Rows.Count; i++)
             {
-                if ((int)item.Tag == index)
+                if ((int)_collectionDataGridView.Rows[i].Tag == index)
                 {
-                    item.Selected = true;
+                    _collectionDataGridView.Rows[i].Selected = true;
                     break;
                 }
             }
