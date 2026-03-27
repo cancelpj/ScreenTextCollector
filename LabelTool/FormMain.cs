@@ -41,6 +41,9 @@ namespace LabelTool
         // 当前屏幕编号
         private int _screenNumber;
 
+        // 可用的 MQTT Topic 列表
+        private List<string> _availableTopics = new List<string>();
+
         // 是否有未保存的更改
         private bool _isModify;
 

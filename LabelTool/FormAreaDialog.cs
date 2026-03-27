@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Windows.Forms;
 
 namespace LabelTool
@@ -9,7 +10,7 @@ namespace LabelTool
         private Label _lblThreshold;
         private Label _lblTopic;
         private TextBox _nameTextBox;
-        private TextBox _topicTextBox;
+        private ComboBox _topicComboBox;
         private NumericUpDown _thresholdNumeric;
         private Button _btnOk;
         private Button _btnCancel;
@@ -38,17 +39,9 @@ namespace LabelTool
         public Func<string, string> ValidateName { get; set; }
 
         /// <summary>
-        /// 新建区域
-        /// </summary>
-        public FormAreaDialog(bool isVerificationMode, float defaultThreshold) :
-            this(isVerificationMode, defaultThreshold, "", 0, 0, 100, 100, "")
-        {
-        }
-
-        /// <summary>
         /// 编辑已有区域
         /// </summary>
-        public FormAreaDialog(bool isVerificationMode, float defaultThreshold, string areaName, int x, int y, int width, int height, string topic = "")
+        public FormAreaDialog(bool isVerificationMode, float defaultThreshold, string areaName, int x, int y, int width, int height, string topic = "", IEnumerable<string> availableTopics = null)
         {
             AreaX = x;
             AreaY = y;
@@ -73,8 +66,29 @@ namespace LabelTool
                 _thresholdNumeric.Visible = false;
                 // 设置 Topic（采集区域模式下显示）
                 _lblTopic.Visible = true;
-                _topicTextBox.Visible = true;
-                _topicTextBox.Text = topic ?? "";
+                _topicComboBox.Visible = true;
+
+                // 加载 Topic 列表
+                _topicComboBox.Items.Add(""); // 空选项表示使用全局 Topic
+                if (availableTopics != null)
+                {
+                    foreach (var t in availableTopics)
+                    {
+                        _topicComboBox.Items.Add(t);
+                    }
+                }
+
+                // 设置当前 Topic
+                if (!string.IsNullOrEmpty(topic))
+                {
+                    _topicComboBox.SelectedItem = topic;
+                    if (_topicComboBox.SelectedIndex < 0)
+                        _topicComboBox.SelectedIndex = 0; // 匹配不上则留空，使用全局配置
+                }
+                else
+                {
+                    _topicComboBox.SelectedIndex = 0;
+                }
             }
             else
             {
@@ -94,7 +108,8 @@ namespace LabelTool
             this._lblName = new System.Windows.Forms.Label();
             this._lblThreshold = new System.Windows.Forms.Label();
             this._lblTopic = new System.Windows.Forms.Label();
-            this._topicTextBox = new System.Windows.Forms.TextBox();
+            this._topicComboBox = new System.Windows.Forms.ComboBox();
+            this._topicComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
 
             // 坐标和尺寸标签和输入框
             this._lblX = new System.Windows.Forms.Label();
@@ -215,11 +230,11 @@ namespace LabelTool
             this._lblTopic.Text = "MQTT Topic:";
             this._lblTopic.Visible = false;
 
-            this._topicTextBox.Location = new System.Drawing.Point(startX + labelWidth, row5Y);
-            this._topicTextBox.Name = "_topicTextBox";
-            this._topicTextBox.Size = new System.Drawing.Size(200, 21);
-            this._topicTextBox.TabIndex = 8;
-            this._topicTextBox.Visible = false;
+            this._topicComboBox.Location = new System.Drawing.Point(startX + labelWidth, row5Y);
+            this._topicComboBox.Name = "_topicComboBox";
+            this._topicComboBox.Size = new System.Drawing.Size(200, 21);
+            this._topicComboBox.TabIndex = 8;
+            this._topicComboBox.Visible = false;
 
             // 按钮
             this._btnOk.DialogResult = System.Windows.Forms.DialogResult.None;
@@ -258,7 +273,7 @@ namespace LabelTool
             this.Controls.Add(this._lblX);
             this.Controls.Add(this._thresholdNumeric);
             this.Controls.Add(this._lblThreshold);
-            this.Controls.Add(this._topicTextBox);
+            this.Controls.Add(this._topicComboBox);
             this.Controls.Add(this._lblTopic);
             this.Controls.Add(this._nameTextBox);
             this.Controls.Add(this._lblName);
@@ -308,7 +323,7 @@ namespace LabelTool
             AreaY = (int)_numericY.Value;
             AreaWidth = (int)_numericWidth.Value;
             AreaHeight = (int)_numericHeight.Value;
-            Topic = _topicTextBox.Visible ? _topicTextBox.Text.Trim() : null;
+            Topic = _topicComboBox.Visible ? _topicComboBox.Text.Trim() : null;
 
             this.DialogResult = DialogResult.OK;
             this.Close();

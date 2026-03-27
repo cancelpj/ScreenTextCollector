@@ -58,6 +58,9 @@ namespace LabelTool
             _toolTip = new ToolTip();
             _toolTip.SetToolTip(_toolStrip, "工具栏：重新截屏 | 保存配置 | 用记事本打开配置 | OCR测试");
 
+            // 加载可用的 MQTT Topic 列表
+            LoadAvailableTopics();
+
             // 检查是否存在旧配置文件
             var configPath = GetConfigPath();
             var screenshotPath = GetScreenshotPath();

@@ -13,10 +13,10 @@ namespace ScreenTextCollector
 
         private static void StartMqttPush(MqttBrokerConfig mqttBrokerConfig, CancellationToken cancellationToken)
         {
-            if (!string.IsNullOrEmpty(mqttBrokerConfig.Ip) && !string.IsNullOrEmpty(mqttBrokerConfig.Topic))
+            if (!string.IsNullOrEmpty(mqttBrokerConfig.Ip) && !string.IsNullOrEmpty(mqttBrokerConfig.DefaultTopic?.Name))
             {
                 Tool.Log.Info(
-                    $"{DateTime.Now} MQTT 推送服务已启动，服务器: {mqttBrokerConfig.Ip}, 主题: {mqttBrokerConfig.Topic}\n");
+                    $"{DateTime.Now} MQTT 推送服务已启动，服务器: {mqttBrokerConfig.Ip}, 主题: {mqttBrokerConfig.DefaultTopic?.Name}\n");
                 try
                 {
                     #region MQTT 连接配置
@@ -49,7 +49,7 @@ namespace ScreenTextCollector
                         if (collectRet.ResultType == MethodResultType.Success)
                         {
                             // 按 Topic 分组
-                            var groupedData = GroupByTopic(collectRet.Data.Data, collectRet.Data.TopicMap, mqttBrokerConfig.Topic);
+                            var groupedData = GroupByTopic(collectRet.Data.Data, collectRet.Data.TopicMap, mqttBrokerConfig.DefaultTopic?.Name);
 
                             foreach (var group in groupedData)
                             {
@@ -65,14 +65,14 @@ namespace ScreenTextCollector
                                 {
                                     telemetry[item.Key] = item.Value;
                                 }
-                                // 添加配置的扩展字段
-                                if (mqttBrokerConfig.ExtendPayload != null)
-                                {
-                                    foreach (var item in mqttBrokerConfig.ExtendPayload)
-                                    {
-                                        telemetry[item.Key] = item.Value;
-                                    }
-                                }
+
+                                // 添加 DefaultTopic 的扩展字段（Topic 级配置会覆盖同名键）
+                                if (mqttBrokerConfig.DefaultTopic != null)
+                                    MergeExtendPayload(telemetry, mqttBrokerConfig.DefaultTopic.ExtendPayload);
+                                // Topic 级扩展字段（优先级更高）
+                                var topicConfig = mqttBrokerConfig.FindTopicConfig(topic);
+                                if (topicConfig != null)
+                                    MergeExtendPayload(telemetry, topicConfig.ExtendPayload);
 
                                 string payloadJson = JsonConvert.SerializeObject(telemetry);
                                 _mqttClient.Publish(topic, payloadJson);
@@ -81,10 +81,10 @@ namespace ScreenTextCollector
                         }
                         else
                         {
-                            // 非成功结果，使用全局 Topic 发送原始消息
+                            // 非成功结果，使用 DefaultTopic 发送原始消息
                             string payloadJson = collectRet.Message;
-                            _mqttClient.Publish(mqttBrokerConfig.Topic, payloadJson);
-                            Tool.Log.Warn($"{DateTime.Now} 采集异常，发布到 [{mqttBrokerConfig.Topic}]: {payloadJson}\n");
+                            _mqttClient.Publish(mqttBrokerConfig.DefaultTopic?.Name, payloadJson);
+                            Tool.Log.Warn($"{DateTime.Now} 采集异常，发布到 [{mqttBrokerConfig.DefaultTopic?.Name}]: {payloadJson}\n");
                         }
 
                         // 使用 WaitOne 实现可中断的等待
@@ -152,6 +152,18 @@ namespace ScreenTextCollector
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// 将 ExtendPayload 合并到遥测数据字典
+        /// </summary>
+        private static void MergeExtendPayload(Dictionary<string, object> telemetry, Dictionary<string, string> extendPayload)
+        {
+            if (extendPayload == null) return;
+            foreach (var item in extendPayload)
+            {
+                telemetry[item.Key] = item.Value;
+            }
         }
 
         private static void MqttConnect(MqttClient mqttClient, string mqttServerIp, int mqttServerPort, CancellationToken cancellationToken)

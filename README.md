@@ -11,7 +11,7 @@
 - 定时抓取指定屏幕画面（通过 ScreenNumber 指定序号）
 - 支持多区域模板匹配（VerificationAreas）验证画面有效性
 - 图像中的文字可采集（CollectionAreas）进行识别
-- 识别结果通过 MQTT 发送到指定的 broker
+- 识别结果通过 MQTT 发送到指定的 broker，不同的采集区域可配置不同的 Topic 和扩展字段
 - 在 HTTP API 模式下，通过外部调用触发截图和识别
 - 可选识别结果保存为本地 CSV 文件
 
@@ -63,6 +63,15 @@
 
 ---
 
+## 下一步计划
+
+- 改造 HTTP 接口，使它可以根据采集区域名称来触发单个区域的采集。
+- 我想在`关于`按钮的左边增加一个`配置`按钮，点击后打开一个窗口编辑 AppSettings 的内容，保存后更新 appsettings.json ，这个编辑窗口的布局你来设计，要求美观简洁，易于操作。appsettings.json 文件移到 data 目录下保存。
+- 采集区域可配置为`OCR`和`图像模板匹配`两种模式，后者根据匹配的图像来区分采集值，比如绿色按钮表示`运行`状态，红色按钮表示`停止`状态。
+- 实现插件化加载 OCR 引擎，引擎文件夹拷贝到 OcrEngine 目录下以后，重启程序即可加载新的引擎。
+
+---
+
 ## 安装与配置
 
 ### 安装要求
@@ -72,10 +81,49 @@
 ### 配置文件
 
 编辑 `appsettings.json` 文件配置相应参数
-- `DeviceName`: 采集点名称
 - `CaptureFrequency`: 截图频率（秒）
 - `CsvRecord`: 是否保存关键记录
-- `MQTTBroker`: MQTT Broker 配置
+- `MqttBroker`: MQTT Broker 配置
+
+#### MqttBroker 配置说明
+
+```json
+{
+  "MqttBroker": {
+    "EnableMqttPush": true,              // 是否启用MQTT推送
+    "CaptureFrequency": 2,               // 采集频率（秒）
+    "Ip": "127.0.0.1",                   // MQTT服务器IP
+    "Port": 1883,                        // MQTT服务器端口
+    "ClientId": "MyClientId",            // MQTT客户端ID
+    "Username": "admin",                 // MQTT用户名
+    "Password": "password",              // MQTT密码
+    "DefaultTopic": {                    // 全局默认 Topic
+      "Name": "screen/collection/default",
+      "ExtendPayload": {                 // 默认扩展字段
+        "CLIENT": "MyClientId",
+        "DEVICECODE": "110001",
+        "GroupCode": "collection1"
+      }
+    },
+    "Topics": [                          // 多 Topic 配置（优先级高于 DefaultTopic）
+      {
+        "Name": "screen/collection/110001",
+        "ExtendPayload": {
+          "GroupCode": "collection1"
+        }
+      },
+      {
+        "Name": "screen/alarm/110001",
+        "ExtendPayload": {
+          "GroupCode": "alarm1"
+        }
+      }
+    ]
+  }
+}
+```
+
+> **ExtendPayload 合并规则**：DefaultTopic.ExtendPayload → 各 Topic.ExtendPayload，后者覆盖前者。采集区域下拉框选择具体 Topic 时使用对应的 ExtendPayload；选择空项则使用 DefaultTopic 的配置。
 
 ## 使用方法
 - 运行 `LabelTool.exe`（标注工具）来图形化配置检测和采集区域。

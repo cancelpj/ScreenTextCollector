@@ -444,12 +444,14 @@ namespace LabelTool
             if (index < 0 || index >= _collectionAreas.Count) return;
 
             var area = _collectionAreas[index];
-            var dialog = new FormAreaDialog(false, 0.8f, area.Name, area.TopLeftX, area.TopLeftY, area.Width, area.Height, area.Topic);
-            dialog.ValidateName = name =>
+            var dialog = new FormAreaDialog(false, 0.8f, area.Name, area.TopLeftX, area.TopLeftY, area.Width, area.Height, area.Topic, _availableTopics)
             {
-                if (IsCollectionNameDuplicate(name, index))
-                    return $"采集区域名称 \"{name}\" 已存在，请使用其他名称。";
-                return null;
+                ValidateName = name =>
+                    {
+                        if (IsCollectionNameDuplicate(name, index))
+                            return $"采集区域名称 \"{name}\" 已存在，请使用其他名称。";
+                        return null;
+                    }
             };
             if (dialog.ShowDialog() == DialogResult.OK)
             {

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace LabelTool
@@ -59,7 +60,7 @@ namespace LabelTool
             {
                 // 采集区域
                 string defaultName = $"采集区域{_collectionAreas.Count + 1}";
-                var dialog = new FormAreaDialog(false, _matchThreshold, defaultName, imgX, imgY, imgWidth, imgHeight);
+                var dialog = new FormAreaDialog(false, _matchThreshold, defaultName, imgX, imgY, imgWidth, imgHeight, "", _availableTopics);
                 dialog.ValidateName = name =>
                 {
                     if (IsCollectionNameDuplicate(name))
@@ -267,6 +268,38 @@ namespace LabelTool
             catch (Exception ex)
             {
                 MessageBox.Show($"加载配置失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// 从 appsettings.json 加载 MQTT Topic 列表
+        /// </summary>
+        private void LoadAvailableTopics()
+        {
+            try
+            {
+                var topics = new List<string>();
+
+                // 包含 DefaultTopic
+                if (Tool.Settings?.MqttBroker?.DefaultTopic != null
+                    && !string.IsNullOrEmpty(Tool.Settings.MqttBroker.DefaultTopic.Name))
+                {
+                    topics.Add(Tool.Settings.MqttBroker.DefaultTopic.Name);
+                }
+
+                // 包含 Topics 列表
+                if (Tool.Settings?.MqttBroker?.Topics != null)
+                {
+                    topics.AddRange(Tool.Settings.MqttBroker.Topics
+                        .Where(t => !string.IsNullOrEmpty(t.Name))
+                        .Select(t => t.Name));
+                }
+
+                _availableTopics = topics.Distinct().ToList();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"加载 Topic 列表失败: {ex.Message}");
             }
         }
 
