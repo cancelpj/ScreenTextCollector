@@ -19,9 +19,7 @@ namespace LabelTool
                 // 弹窗警告
                 var result = MessageBox.Show(
                     "重新截屏将删除现有的所有配置和图片文件，是否继续？",
-                    "确认重新截屏",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Warning);
+                    "确认重新截屏", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
 
                 if (result != DialogResult.Yes)
                 {

@@ -62,37 +62,25 @@ namespace LabelTool
             // 加载可用的 MQTT Topic 列表
             LoadAvailableTopics();
 
-            // 检查是否存在旧配置文件
-            var configPath = GetConfigPath();
+            // 检查截图文件是否存在
             var screenshotPath = GetScreenshotPath();
-            if (File.Exists(configPath))
+            if (!File.Exists(screenshotPath))
             {
-                // 检查截图文件是否存在
-                bool screenshotExists = File.Exists(screenshotPath);
-
-                string message = screenshotExists
-                    ? "已存在旧配置，是否加载？"
-                    : "已存在旧配置文件，但截图文件不存在，是否加载配置？";
-
-                var result = MessageBox.Show(message, "加载配置",
-                    MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-
-                if (result == DialogResult.Yes)
-                {
-                    // 加载配置（包括截图）
-                    LoadConfig();
-                }
-                else
-                {
-                    // 清除旧配置，弹出屏幕选择对话框
-                    DeleteOldConfig();
-                    SelectScreenAndCapture(sender, e);
-                }
+                // 没有截图文件，直接清空旧配置并截屏
+                DeleteOldConfig();
+                SelectScreenAndCapture(sender, e);
             }
             else
             {
-                // 没有配置文件，弹出屏幕选择对话框
-                SelectScreenAndCapture(sender, e);
+                // 加载截图
+                LoadScreenshot(screenshotPath);
+
+                // 有旧配置文件则加载
+                var configPath = GetConfigPath();
+                if (File.Exists(configPath))
+                {
+                    LoadConfig();
+                }
             }
 
             // 设置默认选中检测区域
