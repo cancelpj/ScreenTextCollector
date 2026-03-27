@@ -38,53 +38,60 @@ namespace ScreenTextCollector
 
                     while (!cancellationToken.IsCancellationRequested)
                     {
-                        var collectRet = Tool.ProcessScreenCaptureWithTopic(
-                            Tool.GetScreenCapture().Message,
+                        var collectRet = Tool.CaptureAndVerify(
                             OcrService.VerifyImage,
-                            OcrService.PerformOcr);
+                            Tool.CaptureSettings.VerificationAreas);
 
-                        // 连接 MQTT
-                        MqttConnect(_mqttClient, mqttBrokerConfig.Ip, mqttBrokerConfig.Port, cancellationToken);
-
-                        if (collectRet.ResultType == MethodResultType.Success)
+                        if (collectRet.ResultType != MethodResultType.Success)
                         {
-                            // 按 Topic 分组
-                            var groupedData = GroupByTopic(collectRet.Data.Data, collectRet.Data.TopicMap, mqttBrokerConfig.DefaultTopic?.Name);
-
-                            foreach (var group in groupedData)
-                            {
-                                string topic = group.Key;
-                                var data = group.Value;
-
-                                // 构建遥测数据
-                                var telemetry = new Dictionary<string, object>
-                                {
-                                    { "TIMESTAMP", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }
-                                };
-                                foreach (var item in data)
-                                {
-                                    telemetry[item.Key] = item.Value;
-                                }
-
-                                // 添加 DefaultTopic 的扩展字段（Topic 级配置会覆盖同名键）
-                                if (mqttBrokerConfig.DefaultTopic != null)
-                                    MergeExtendPayload(telemetry, mqttBrokerConfig.DefaultTopic.ExtendPayload);
-                                // Topic 级扩展字段（优先级更高）
-                                var topicConfig = mqttBrokerConfig.FindTopicConfig(topic);
-                                if (topicConfig != null)
-                                    MergeExtendPayload(telemetry, topicConfig.ExtendPayload);
-
-                                string payloadJson = JsonConvert.SerializeObject(telemetry);
-                                _mqttClient.Publish(topic, payloadJson);
-                                Tool.Log.Info($"{DateTime.Now} 发布 MQTT 消息到 [{topic}]: {payloadJson}\n");
-                            }
+                            // 验证失败，跳过本次推送
+                            Tool.Log.Warn($"{DateTime.Now} 采集异常，跳过本次推送: {collectRet.Message}\n");
                         }
                         else
                         {
-                            // 非成功结果，使用 DefaultTopic 发送原始消息
-                            string payloadJson = collectRet.Message;
-                            _mqttClient.Publish(mqttBrokerConfig.DefaultTopic?.Name, payloadJson);
-                            Tool.Log.Warn($"{DateTime.Now} 采集异常，发布到 [{mqttBrokerConfig.DefaultTopic?.Name}]: {payloadJson}\n");
+                            var ocrRet = Tool.ProcessScreenCaptureWithTopic(collectRet.Message, OcrService.PerformOcr);
+
+                            if (ocrRet.ResultType == MethodResultType.Success)
+                            {
+                                // 建立 MQTT 连接
+                                MqttConnect(_mqttClient, mqttBrokerConfig.Ip, mqttBrokerConfig.Port, cancellationToken);
+
+                                // 按 Topic 分组
+                                var groupedData = GroupByTopic(ocrRet.Data.Data, ocrRet.Data.TopicMap, mqttBrokerConfig.DefaultTopic?.Name);
+
+                                foreach (var group in groupedData)
+                                {
+                                    string topic = group.Key;
+                                    var data = group.Value;
+
+                                    // 构建遥测数据
+                                    var telemetry = new Dictionary<string, object>
+                                    {
+                                        { "TIMESTAMP", DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() }
+                                    };
+                                    foreach (var item in data)
+                                    {
+                                        telemetry[item.Key] = item.Value;
+                                    }
+
+                                    // 添加 DefaultTopic 的扩展字段（Topic 级配置会覆盖同名键）
+                                    if (mqttBrokerConfig.DefaultTopic != null)
+                                        MergeExtendPayload(telemetry, mqttBrokerConfig.DefaultTopic.ExtendPayload);
+                                    // Topic 级扩展字段（优先级更高）
+                                    var topicConfig = mqttBrokerConfig.FindTopicConfig(topic);
+                                    if (topicConfig != null)
+                                        MergeExtendPayload(telemetry, topicConfig.ExtendPayload);
+
+                                    string payloadJson = JsonConvert.SerializeObject(telemetry);
+                                    _mqttClient.Publish(topic, payloadJson);
+                                    Tool.Log.Info($"{DateTime.Now} 发布 MQTT 消息到 [{topic}]: {payloadJson}\n");
+                                }
+                            }
+                            else
+                            {
+                                // OCR 失败，跳过本次推送
+                                Tool.Log.Warn($"{DateTime.Now} OCR 失败，跳过本次推送: {ocrRet.Message}\n");
+                            }
                         }
 
                         // 使用 WaitOne 实现可中断的等待

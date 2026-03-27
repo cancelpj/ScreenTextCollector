@@ -7,6 +7,7 @@ namespace ScreenTextCollector
 {
     internal static partial class Program
     {
+        private const string collectEndpoint = "/collect";
         #region HTTP 服务
 
         private static void StartHttpServer(HttpConfig httpConfig)
@@ -35,27 +36,40 @@ namespace ScreenTextCollector
                 HttpListenerResponse response = context.Response;
 
                 response.StatusCode = 200;
+                response.ContentType = "application/json; charset=utf-8";
 
                 try
                 {
+
                     // 只处理 GET 请求
                     if (request.HttpMethod == "GET")
                     {
+                        var url = request.Url.AbsolutePath.TrimEnd();
+
                         // 根据请求的URL路径返回不同的响应
                         string responseString;
-                        if (request.Url.AbsolutePath == "/health")
+                        if (url == "/health" || url == "/health/")
                         {
                             responseString = "ScreenTextCollector is alive.";
                         }
-                        else if (request.Url.AbsolutePath.StartsWith("/process/"))
+                        else if (url.StartsWith("/process/"))
                         {
-                            var processName = request.Url.AbsolutePath.Replace("/process/", "");
+                            var processName = url.Replace("/process/", "");
                             //按 processName 检查进程状态
                             responseString = CheckProcess(processName);
                         }
-                        else if (request.Url.AbsolutePath == "/stc")
+                        else if (url == collectEndpoint || url == $"{collectEndpoint}/")
                         {
+                            // 触发所有区域采集
                             var ret = ScreenTextCollect();
+                            responseString = ret.Message;
+                            response.StatusCode = ret.ResultType == MethodResultType.Success ? 200 : 500;
+                        }
+                        else if (url.StartsWith($"{collectEndpoint}/"))
+                        {
+                            // 触发单个区域采集
+                            var areaName = Uri.UnescapeDataString(url.Replace($"{collectEndpoint}/", ""));
+                            var ret = ScreenTextCollect(areaName);
                             responseString = ret.Message;
                             response.StatusCode = ret.ResultType == MethodResultType.Success ? 200 : 500;
                         }

@@ -125,16 +125,38 @@ namespace PluginInterface
         }
 
         /// <summary>
+        /// 执行截屏并进行图像校验，成功时返回截图路径
+        /// </summary>
+        /// <param name="verifyImage">图像校验委托</param>
+        /// <param name="verificationAreas">验证区域列表</param>
+        /// <returns>校验成功的截图路径，失败时返回对应 MethodResult</returns>
+        public static MethodResult CaptureAndVerify(
+            Func<string, List<ImageVerificationArea>, bool> verifyImage,
+            List<ImageVerificationArea> verificationAreas)
+        {
+            var ret = GetScreenCapture();
+            if (ret.ResultType != MethodResultType.Success)
+                return ret;
+
+            if (!verifyImage(ret.Message, verificationAreas))
+            {
+                File.Delete(ret.Message);
+                return new MethodResult("未监测到程序画面", MethodResultType.Warning);
+            }
+
+            return ret;
+        }
+
+        /// <summary>
         /// 处理屏幕截图，执行图像校验和OCR文字采集
         /// </summary>
-        /// <param name="screenShotPath">屏幕截图文件路径</param>
-        /// <param name="verifyImage">图像校验委托，用于验证截图是否符合预期条件</param>
+        /// <param name="screenShotPath">已验证的屏幕截图文件路径</param>
         /// <param name="performOcr">OCR识别委托，用于从图像采集区域提取文字</param>
-        /// <returns>处理结果。成功时返回JSON格式的采集数据；校验失败时返回警告信息；异常时返回错误信息</returns>
-        public static MethodResult ProcessScreenCapture(string screenShotPath, Func<string, List<ImageVerificationArea>, bool> verifyImage,
+        /// <returns>处理结果。成功时返回JSON格式的采集数据；异常时返回错误信息</returns>
+        public static MethodResult ProcessScreenCapture(string screenShotPath,
             Func<string, ImageCollectionArea, string> performOcr)
         {
-            var ret = ProcessScreenCaptureWithTopic(screenShotPath, verifyImage, performOcr);
+            var ret = ProcessScreenCaptureWithTopic(screenShotPath, performOcr);
             if (ret.ResultType == MethodResultType.Success)
             {
                 return new MethodResult(JsonConvert.SerializeObject(ret.Data.Data), MethodResultType.Success);
@@ -145,23 +167,14 @@ namespace PluginInterface
         /// <summary>
         /// 处理屏幕截图，返回包含 Topic 映射的采集结果
         /// </summary>
-        /// <param name="screenShotPath">屏幕截图文件路径</param>
-        /// <param name="verifyImage">图像校验委托</param>
+        /// <param name="screenShotPath">已验证的屏幕截图文件路径</param>
         /// <param name="performOcr">OCR识别委托</param>
         /// <returns>采集结果，包含数据字典和 Topic 映射</returns>
         public static MethodResult<CollectionResult> ProcessScreenCaptureWithTopic(string screenShotPath,
-            Func<string, List<ImageVerificationArea>, bool> verifyImage,
             Func<string, ImageCollectionArea, string> performOcr)
         {
             try
             {
-                // 图像校验
-                if (!verifyImage(screenShotPath, CaptureSettings.VerificationAreas))
-                {
-                    File.Delete(screenShotPath);
-                    return new MethodResult<CollectionResult>("未监测到程序画面", MethodResultType.Warning);
-                }
-
                 // 图像采集
                 var data = new ConcurrentDictionary<string, string>();
                 var topicMap = new ConcurrentDictionary<string, string>();
@@ -177,7 +190,6 @@ namespace PluginInterface
                     SaveToCsv(data);
 
                 // 汇总结果
-                File.Delete(screenShotPath);
                 var result = new CollectionResult
                 {
                     Data = new Dictionary<string, string>(data),
@@ -190,6 +202,53 @@ namespace PluginInterface
             {
                 Log.Error(ex, "处理截屏失败");
                 return new MethodResult<CollectionResult>("处理截屏失败", ex);
+            }
+            finally
+            {
+                // 确保截图文件被清理
+                try { File.Delete(screenShotPath); } catch { }
+            }
+        }
+
+        /// <summary>
+        /// 处理单个采集区域的 OCR
+        /// </summary>
+        /// <param name="screenShotPath">屏幕截图路径</param>
+        /// <param name="areaName">采集区域名称</param>
+        /// <param name="performOcr">OCR 识别委托</param>
+        /// <returns>MethodResult，单区域采集结果</returns>
+        public static MethodResult ProcessScreenCaptureSingle(string screenShotPath, string areaName,
+            Func<string, ImageCollectionArea, string> performOcr)
+        {
+            var area = CaptureSettings.CollectionAreas?.Find(a => a.Name == areaName);
+            if (area == null)
+            {
+                return new MethodResult($"未找到采集区域: {areaName}", MethodResultType.Error);
+            }
+
+            try
+            {
+                string result = performOcr(screenShotPath, area);
+                Log.Info("单个区域识别结果 [{0}]: {1}", areaName, result);
+
+                var singleResult = new Dictionary<string, string> { { areaName, result } };
+
+                if (Settings.CsvRecord)
+                {
+                    SaveToCsv(singleResult);
+                }
+
+                return new MethodResult(result, MethodResultType.Success);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "处理单区域截屏失败");
+                return new MethodResult("处理截屏失败", ex);
+            }
+            finally
+            {
+                // 确保截图文件被清理
+                try { File.Delete(screenShotPath); } catch { }
             }
         }
 

@@ -7,16 +7,29 @@ namespace ScreenTextCollector
     {
         #region 业务功能
 
-        private static MethodResult ScreenTextCollect()
+        /// <summary>
+        /// 执行屏幕文本采集
+        /// </summary>
+        /// <param name="areaName">采集区域名称，为空时采集所有区域</param>
+        /// <returns>采集结果</returns>
+        private static MethodResult ScreenTextCollect(string areaName = null)
         {
-            var ret = Tool.GetScreenCapture();
+            var ret = Tool.CaptureAndVerify(OcrService.VerifyImage, Tool.CaptureSettings.VerificationAreas);
             if (ret.ResultType != MethodResultType.Success)
             {
                 Tool.OutputMessage(ret);
                 return ret;
             }
 
-            ret = Tool.ProcessScreenCapture(ret.Message, OcrService.VerifyImage, OcrService.PerformOcr);
+            if (string.IsNullOrEmpty(areaName))
+            {
+                ret = Tool.ProcessScreenCapture(ret.Message, OcrService.PerformOcr);
+            }
+            else
+            {
+                ret = Tool.ProcessScreenCaptureSingle(ret.Message, areaName, OcrService.PerformOcr);
+            }
+
             if (ret.ResultType != MethodResultType.Success)
             {
                 Tool.OutputMessage(ret);
