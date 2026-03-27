@@ -115,6 +115,7 @@ namespace LabelTool
                     var area = _verificationAreas[_selectedVerificationIndex];
                     area.TopLeftX += deltaImgX;
                     area.TopLeftY += deltaImgY;
+                    _isModify = true;
                     RefreshVerificationList();
                 }
                 else if (_selectedCollectionIndex >= 0)
@@ -122,6 +123,7 @@ namespace LabelTool
                     var area = _collectionAreas[_selectedCollectionIndex];
                     area.TopLeftX += deltaImgX;
                     area.TopLeftY += deltaImgY;
+                    _isModify = true;
                     RefreshCollectionList();
                 }
                 _dragStart = e.Location;
@@ -134,12 +136,14 @@ namespace LabelTool
                 {
                     var area = _verificationAreas[_selectedVerificationIndex];
                     ResizeArea(new VerificationAreaAdapter(area), _resizeHandle, deltaImgX, deltaImgY);
+                    _isModify = true;
                     RefreshVerificationList();
                 }
                 else if (_selectedCollectionIndex >= 0)
                 {
                     var area = _collectionAreas[_selectedCollectionIndex];
                     ResizeArea(new CollectionAreaAdapter(area), _resizeHandle, deltaImgX, deltaImgY);
+                    _isModify = true;
                     RefreshCollectionList();
                 }
                 _dragStart = e.Location;
@@ -431,6 +435,7 @@ namespace LabelTool
                 area.Height = dialog.AreaHeight;
                 area.FileName = dialog.AreaName + ".png";
                 area.MatchThreshold = dialog.MatchThreshold;
+                _isModify = true;
                 RefreshVerificationList();
                 _imagePanel.Invalidate();
             }
@@ -461,6 +466,7 @@ namespace LabelTool
                 area.Height = dialog.AreaHeight;
                 area.Name = dialog.AreaName;
                 area.Topic = dialog.Topic;
+                _isModify = true;
                 RefreshCollectionList();
                 _imagePanel.Invalidate();
             }
