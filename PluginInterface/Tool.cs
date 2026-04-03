@@ -30,11 +30,72 @@ namespace PluginInterface
 
     public static class Tool
     {
+        private static AppSettings _settings;
         /// <summary>
-        /// 应用程序配置（从 appsettings.json 加载）
+        /// 应用程序配置（从 data/appsettings.json 加载）
         /// </summary>
-        public static readonly AppSettings Settings =
-            JsonConvert.DeserializeObject<AppSettings>(File.ReadAllText("appsettings.json"));
+        public static AppSettings Settings
+        {
+            get
+            {
+                if (_settings == null)
+                {
+                    var dataDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data");
+                    var configPath = Path.Combine(dataDir, "appsettings.json");
+
+                    // 确保 data 目录存在
+                    if (!Directory.Exists(dataDir))
+                    {
+                        Directory.CreateDirectory(dataDir);
+                    }
+
+                    // 兼容旧版本：如果新路径不存在，检查旧路径并迁移
+                    if (!File.Exists(configPath))
+                    {
+                        var oldPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json");
+                        if (File.Exists(oldPath))
+                        {
+                            // 从旧路径复制到新路径
+                            File.Copy(oldPath, configPath);
+                        }
+                    }
+
+                    if (File.Exists(configPath))
+                    {
+                        _settings = JsonConvert.DeserializeObject<AppSettings>(File.ReadAllText(configPath));
+                    }
+                    else
+                    {
+                        _settings = new AppSettings();
+                    }
+                }
+                return _settings;
+            }
+        }
+
+        /// <summary>
+        /// 重新加载配置（用于配置修改后刷新）
+        /// </summary>
+        public static void ReloadSettings()
+        {
+            _settings = null;
+        }
+
+        /// <summary>
+        /// 保存配置到 data/appsettings.json
+        /// </summary>
+        public static void SaveSettings(AppSettings settings)
+        {
+            var dataDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data");
+            if (!Directory.Exists(dataDir))
+            {
+                Directory.CreateDirectory(dataDir);
+            }
+            var configPath = Path.Combine(dataDir, "appsettings.json");
+            var json = JsonConvert.SerializeObject(settings, Formatting.Indented);
+            File.WriteAllText(configPath, json);
+            ReloadSettings();
+        }
 
         /// <summary>
         /// 屏幕采集配置（从 data/CaptureSettings.json 加载）

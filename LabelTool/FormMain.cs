@@ -1,10 +1,10 @@
+using PluginInterface;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Reflection;
 using System.Windows.Forms;
-using PluginInterface;
 
 namespace LabelTool
 {
@@ -59,6 +59,8 @@ namespace LabelTool
         private bool _isPanning;                   // 是否正在平移
         private const float MIN_ZOOM = 0.5f;        // 最小缩放
         private const float MAX_ZOOM = 1.5f;       // 最大缩放
+        private const int ZOOM_TRACKBAR_MIN = 50;  // TrackBar最小值
+        private const int ZOOM_TRACKBAR_MAX = 150; // TrackBar最大值
         private const float ZOOM_STEP = 0.1f;      // 每次缩放步进
 
         // 控件
@@ -83,6 +85,7 @@ namespace LabelTool
         private ToolStripButton _btnSave;
         private ToolStripButton _btnOpenConfig;
         private ToolStripButton _btnAbout;
+        private ToolStripButton _btnSettings;
         private ToolStripLabel _ocrEngineLabel;
         private ToolStripComboBox _ocrEngineComboBox;
         private ToolStripButton _btnOcrTest;
@@ -94,6 +97,26 @@ namespace LabelTool
         private ToolStripButton _btnZoomIn;
         private Panel _scrollContainer;
 
+        // 工具栏分隔符
+        private ToolStripSeparator _toolStripSepA;
+        private ToolStripSeparator _toolStripSepB;
+        private ToolStripSeparator _toolStripSepC;
+        private ToolStripSeparator _toolStripSepD;
+        private ToolStripSeparator _toolStripSepE;
+        private ToolStripSeparator _toolStripSepF;
+
+        // ListView 列
+        private ColumnHeader _colName;
+        private ColumnHeader _colLocation;
+        private ColumnHeader _colAction;
+
+        // DataGridView 列
+        private DataGridViewTextBoxColumn _nameColumn;
+        private DataGridViewTextBoxColumn _locationColumn;
+        private DataGridViewTextBoxColumn _resultColumn;
+        private DataGridViewButtonColumn _expandColumn;
+        private DataGridViewButtonColumn _deleteColumn;
+
         // 手柄偏移因子（相对于 rect.X/Y 的比例）：左上、上、右上、右、右下、下、左下、左
         // 每个元素的 (X,Y) 表示 rect.X + rect.Width * X, rect.Y + rect.Height * Y
         private static readonly float[] _handleFX = { 0f, 0.5f, 1f, 1f, 1f, 0.5f, 0f, 0f };
@@ -102,6 +125,12 @@ namespace LabelTool
         public FormMain()
         {
             InitializeComponent();
+
+            // 启用双缓冲，减少闪烁
+            _imagePanel.GetType().GetProperty("DoubleBuffered",
+                BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(_imagePanel, true, null);
+
             // 设置应用图标（从文件加载）
             var resourcesDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources");
             var appIconPath = Path.Combine(resourcesDir, "Application.png");
@@ -114,22 +143,33 @@ namespace LabelTool
             }
             // 启用键盘快捷键捕获
             KeyPreview = true;
-            KeyDown += FormMain_KeyDown;
+            KeyDown += new System.Windows.Forms.KeyEventHandler(this.FormMain_KeyDown);
             // 启动时最大化窗口
             WindowState = FormWindowState.Maximized;
-            Load += FormMain_Load;
-            FormClosing += FormMain_FormClosing;
+            Load += new System.EventHandler(this.FormMain_Load);
+            FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.FormMain_FormClosing);
         }
 
         private void InitializeComponent()
         {
+            // 先创建所有控件对象（在 SuspendLayout 之前）
             _toolStrip = new ToolStrip();
+            _btnCapture = new ToolStripButton();
+            _btnSave = new ToolStripButton();
+            _btnOpenConfig = new ToolStripButton();
+            _btnSettings = new ToolStripButton();
+            _btnAbout = new ToolStripButton();
+            _ocrEngineLabel = new ToolStripLabel();
+            _ocrEngineComboBox = new ToolStripComboBox();
+            _btnOcrTest = new ToolStripButton();
+            _cmbZoomMode = new ToolStripComboBox();
+            _cmbZoomLevel = new ToolStripComboBox();
+            _btnZoomOut = new ToolStripButton();
+            _btnZoomIn = new ToolStripButton();
+            _zoomTrackBar = new TrackBar();
+            _zoomTrackBarHost = new ToolStripControlHost(_zoomTrackBar);
             _scrollContainer = new Panel();
             _imagePanel = new Panel();
-            // 启用双缓冲，减少闪烁
-            _imagePanel.GetType().GetProperty("DoubleBuffered",
-                BindingFlags.Instance | BindingFlags.NonPublic)
-                .SetValue(_imagePanel, true, null);
             _listPanel = new Panel();
             _verificationGroup = new GroupBox();
             _collectionGroup = new GroupBox();
@@ -140,8 +180,65 @@ namespace LabelTool
             _thresholdComboBox = new ToolStripComboBox();
             _radioVerificationArea = new RadioButton();
             _radioCollectionArea = new RadioButton();
+            _verificationListView = new ListView();
+            _collectionDataGridView = new DataGridView();
+            _lblTabHint = new Label();
+            _toolTip = new ToolTip();
+            _verticalSplit = new SplitContainer();
 
-            #region 工具栏 ToolStrip
+            // 工具栏分隔符
+            _toolStripSepA = new ToolStripSeparator();
+            _toolStripSepB = new ToolStripSeparator();
+            _toolStripSepC = new ToolStripSeparator();
+            _toolStripSepD = new ToolStripSeparator();
+            _toolStripSepE = new ToolStripSeparator();
+            _toolStripSepF = new ToolStripSeparator();
+
+            // ListView 列
+            _colName = new ColumnHeader();
+            _colName.Text = "名称";
+            _colName.Width = 100;
+
+            _colLocation = new ColumnHeader();
+            _colLocation.Text = "位置";
+            _colLocation.Width = 150;
+
+            _colAction = new ColumnHeader();
+            _colAction.Text = "";
+            _colAction.Width = 30;
+
+            // DataGridView 列
+            _nameColumn = new DataGridViewTextBoxColumn();
+            _nameColumn.HeaderText = "名称";
+            _nameColumn.Width = 100;
+            _nameColumn.ReadOnly = true;
+
+            _locationColumn = new DataGridViewTextBoxColumn();
+            _locationColumn.HeaderText = "位置";
+            _locationColumn.Width = 120;
+            _locationColumn.ReadOnly = true;
+
+            _resultColumn = new DataGridViewTextBoxColumn();
+            _resultColumn.HeaderText = "识别结果";
+            _resultColumn.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+
+            _expandColumn = new DataGridViewButtonColumn();
+            _expandColumn.HeaderText = "";
+            _expandColumn.Width = 30;
+            _expandColumn.UseColumnTextForButtonValue = true;
+            _expandColumn.Text = "...";
+            _expandColumn.FlatStyle = FlatStyle.Popup;
+            _expandColumn.Resizable = DataGridViewTriState.False;
+
+            _deleteColumn = new DataGridViewButtonColumn();
+            _deleteColumn.HeaderText = "";
+            _deleteColumn.Width = 30;
+            _deleteColumn.UseColumnTextForButtonValue = true;
+            _deleteColumn.Text = "×";
+            _deleteColumn.FlatStyle = FlatStyle.Popup;
+            _deleteColumn.Resizable = DataGridViewTriState.False;
+
+            SuspendLayout();
 
             // 加载图标资源
             var resourcesDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources");
@@ -151,91 +248,123 @@ namespace LabelTool
             var ocrIcon = LoadIconFromResources(resourcesDir, "ocr.png");
             var aboutIcon = SystemIcons.Information.ToBitmap();
 
+            #region 工具栏 ToolStrip
+
             // ToolStrip
-            _btnCapture = new ToolStripButton("重新截屏 Ctrl+R", screenshotIcon, BtnCapture_Click);
-            _btnSave = new ToolStripButton("保存配置 Ctrl+S", saveIcon, BtnSave_Click);
-            _btnOpenConfig = new ToolStripButton("用记事本打开配置 Ctrl+O", openIcon, BtnOpenConfig_Click);
+            _btnCapture.Name = "_btnCapture";
+            _btnCapture.Text = "重新截屏 Ctrl+R";
+            _btnCapture.Image = screenshotIcon;
+            _btnCapture.Click += new System.EventHandler(this.BtnCapture_Click);
+
+            _btnSave.Name = "_btnSave";
+            _btnSave.Text = "保存采集配置 Ctrl+S";
+            _btnSave.Image = saveIcon;
+            _btnSave.Click += new System.EventHandler(this.BtnSave_Click);
+
+            _btnOpenConfig.Name = "_btnOpenConfig";
+            _btnOpenConfig.Text = "用记事本打开 Ctrl+O";
+            _btnOpenConfig.Image = openIcon;
+            _btnOpenConfig.Click += new System.EventHandler(this.BtnOpenConfig_Click);
+
+            // 使用 Spring 属性将配置、关于按钮推到右边
+            _btnSettings.Name = "_btnSettings";
+            _btnSettings.Text = "通讯配置";
+            _btnSettings.Alignment = ToolStripItemAlignment.Right;
+            _btnSettings.Click += new System.EventHandler(this.BtnSettings_Click);
+
+            _btnAbout.Name = "_btnAbout";
+            _btnAbout.Text = "关于";
+            _btnAbout.Image = aboutIcon;
+            _btnAbout.Alignment = ToolStripItemAlignment.Right;
+            _btnAbout.Click += new System.EventHandler(this.BtnAbout_Click);
+
             _toolStrip.Items.Add(_btnCapture);
             _toolStrip.Items.Add(_btnSave);
             _toolStrip.Items.Add(_btnOpenConfig);
-
-            // 使用 Spring 属性将关于按钮推到右边
-            _toolStrip.Items.Add(new ToolStripSeparator());
-            _btnAbout = new ToolStripButton("关于", aboutIcon, BtnAbout_Click);
-            _btnAbout.Alignment = ToolStripItemAlignment.Right;
+            _toolStrip.Items.Add(_toolStripSepA);
             _toolStrip.Items.Add(_btnAbout);
+            _toolStrip.Items.Add(_btnSettings);
             _toolStrip.Location = new Point(0, 0);
             _toolStrip.Name = "_toolStrip";
             _toolStrip.Size = new Size(1024, 25);
             _toolStrip.TabIndex = 1;
 
             // 匹配阈值下拉框
-            _toolStrip.Items.Add(_toolStripSeparator1);
+            _toolStripLabel1.Name = "_toolStripLabel1";
             _toolStripLabel1.Text = "匹配阈值:";
             _thresholdComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
             _thresholdComboBox.Items.AddRange(new object[] { "0.7", "0.8", "0.85", "0.9", "0.95" });
+            _thresholdComboBox.Name = "_thresholdComboBox";
             _thresholdComboBox.SelectedIndex = 1; // 默认0.8
-            _thresholdComboBox.SelectedIndexChanged += ThresholdComboBox_SelectedIndexChanged;
-            _toolStrip.Items.Add(_toolStripLabel1);
-            _toolStrip.Items.Add(_thresholdComboBox);
+            _thresholdComboBox.SelectedIndexChanged += new System.EventHandler(this.ThresholdComboBox_SelectedIndexChanged);
 
             // OCR引擎下拉框
-            var toolStripSeparator2 = new ToolStripSeparator();
-            _ocrEngineLabel = new ToolStripLabel();
+            _ocrEngineLabel.Name = "_ocrEngineLabel";
             _ocrEngineLabel.Text = "OCR引擎:";
-            _ocrEngineComboBox = new ToolStripComboBox();
             _ocrEngineComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
             _ocrEngineComboBox.Items.AddRange(new object[] { "PaddleOCR", "OpenCvSharp" });
+            _ocrEngineComboBox.Name = "_ocrEngineComboBox";
             _ocrEngineComboBox.SelectedIndex = 0; // 默认PaddleOCR
-            _ocrEngineComboBox.SelectedIndexChanged += OcrEngineComboBox_SelectedIndexChanged;
-            _toolStrip.Items.Add(toolStripSeparator2);
-            _toolStrip.Items.Add(_ocrEngineLabel);
-            _toolStrip.Items.Add(_ocrEngineComboBox);
+            _ocrEngineComboBox.SelectedIndexChanged += new System.EventHandler(this.OcrEngineComboBox_SelectedIndexChanged);
 
             // OCR测试按钮
-            var toolStripSeparator3 = new ToolStripSeparator();
-            _btnOcrTest = new ToolStripButton("OCR测试 Ctrl+T", ocrIcon, BtnOcrTest_Click);
-            _toolStrip.Items.Add(toolStripSeparator3);
+            _btnOcrTest.Name = "_btnOcrTest";
+            _btnOcrTest.Text = "OCR测试 Ctrl+T";
+            _btnOcrTest.Image = ocrIcon;
+            _btnOcrTest.Click += new System.EventHandler(this.BtnOcrTest_Click);
+
+            _toolStrip.Items.Add(_toolStripSeparator1);
+            _toolStrip.Items.Add(_toolStripLabel1);
+            _toolStrip.Items.Add(_thresholdComboBox);
+            _toolStrip.Items.Add(_toolStripSepB);
+            _toolStrip.Items.Add(_ocrEngineLabel);
+            _toolStrip.Items.Add(_ocrEngineComboBox);
+            _toolStrip.Items.Add(_toolStripSepC);
             _toolStrip.Items.Add(_btnOcrTest);
 
             // 缩放控制
-            var toolStripSeparator4 = new ToolStripSeparator();
-            _cmbZoomMode = new ToolStripComboBox();
             _cmbZoomMode.DropDownStyle = ComboBoxStyle.DropDownList;
             _cmbZoomMode.Items.AddRange(new object[] { "自动缩放", "手动缩放" });
+            _cmbZoomMode.Name = "_cmbZoomMode";
             _cmbZoomMode.SelectedIndex = 0; // 默认自动缩放
-            _cmbZoomMode.SelectedIndexChanged += CmbZoomMode_SelectedIndexChanged;
-            _cmbZoomLevel = new ToolStripComboBox();
+            _cmbZoomMode.SelectedIndexChanged += new System.EventHandler(this.CmbZoomMode_SelectedIndexChanged);
+
             _cmbZoomLevel.DropDownStyle = ComboBoxStyle.DropDown;
             _cmbZoomLevel.Items.AddRange(new object[] { "50%", "75%", "100%", "125%", "150%" });
+            _cmbZoomLevel.Name = "_cmbZoomLevel";
             _cmbZoomLevel.SelectedIndex = 2; // 默认100%
-            _cmbZoomLevel.TextChanged += CmbZoomLevel_TextChanged;
-            _cmbZoomLevel.KeyDown += CmbZoomLevel_KeyDown;
-            _btnZoomOut = new ToolStripButton("-", null, BtnZoomOut_Click);
-            _btnZoomOut.ToolTipText = "缩小";
-            _zoomTrackBar = new TrackBar
-            {
-                TickStyle = TickStyle.None,
-                AutoSize = false,
-                Height = 20,
-                Width = 100,
-                Minimum = (int)(MIN_ZOOM * 100),
-                Maximum = (int)(MAX_ZOOM * 100),
-                Value = 100,
-                Enabled = false
-            };
-            // TrackBar 垂直居中（ToolStrip 高度约25）
-            _zoomTrackBar.Top = (_toolStrip.Height - _zoomTrackBar.Height) / 2;
-            _zoomTrackBar.Scroll += ZoomTrackBar_Scroll;
-            _zoomTrackBarHost = new ToolStripControlHost(_zoomTrackBar);
-            _zoomTrackBarHost.Padding = Padding.Empty;
-            _zoomTrackBarHost.Margin = new Padding(2, 0, 2, 0);
-            _btnZoomIn = new ToolStripButton("+", null, BtnZoomIn_Click);
-            _btnZoomIn.ToolTipText = "放大";
+            _cmbZoomLevel.TextChanged += new System.EventHandler(this.CmbZoomLevel_TextChanged);
+            _cmbZoomLevel.KeyDown += new System.Windows.Forms.KeyEventHandler(this.CmbZoomLevel_KeyDown);
 
-            _toolStrip.Items.Add(toolStripSeparator4);
+            _btnZoomOut.Name = "_btnZoomOut";
+            _btnZoomOut.Text = "-";
+            _btnZoomOut.ToolTipText = "缩小";
+            _btnZoomOut.Click += new System.EventHandler(this.BtnZoomOut_Click);
+
+            _zoomTrackBar.TickStyle = TickStyle.None;
+            _zoomTrackBar.AutoSize = false;
+            _zoomTrackBar.Height = 20;
+            _zoomTrackBar.Width = 100;
+            _zoomTrackBar.Minimum = ZOOM_TRACKBAR_MIN;
+            _zoomTrackBar.Maximum = ZOOM_TRACKBAR_MAX;
+            _zoomTrackBar.Value = 100;
+            _zoomTrackBar.Enabled = false;
+            _zoomTrackBar.Name = "_zoomTrackBar";
+            // TrackBar 垂直居中（ToolStrip 高度约25，TrackBar 高度20，偏移2像素）
+            _zoomTrackBar.Top = 2;
+            _zoomTrackBar.Scroll += new System.EventHandler(this.ZoomTrackBar_Scroll);
+
+            _zoomTrackBarHost.Padding = new Padding(0);
+            _zoomTrackBarHost.Margin = new Padding(2, 0, 2, 0);
+
+            _btnZoomIn.Name = "_btnZoomIn";
+            _btnZoomIn.Text = "+";
+            _btnZoomIn.ToolTipText = "放大";
+            _btnZoomIn.Click += new System.EventHandler(this.BtnZoomIn_Click);
+
+            _toolStrip.Items.Add(_toolStripSepD);
             _toolStrip.Items.Add(_cmbZoomMode);
-            _toolStrip.Items.Add(new ToolStripSeparator());
+            _toolStrip.Items.Add(_toolStripSepE);
             _toolStrip.Items.Add(_cmbZoomLevel);
             _toolStrip.Items.Add(_btnZoomOut);
             _toolStrip.Items.Add(_zoomTrackBarHost);
@@ -244,37 +373,33 @@ namespace LabelTool
             #endregion
 
             // 垂直SplitContainer（左侧图片，右侧列表）
-            _verticalSplit = new SplitContainer
-            {
-                Dock = DockStyle.Fill,
-                Orientation = Orientation.Vertical,
-                SplitterDistance = 700,
-                BorderStyle = BorderStyle.FixedSingle
-            };
+            _verticalSplit.Dock = DockStyle.Fill;
+            _verticalSplit.Orientation = Orientation.Vertical;
+            _verticalSplit.SplitterDistance = 700;
+            _verticalSplit.BorderStyle = BorderStyle.FixedSingle;
+            _verticalSplit.Name = "_verticalSplit";
 
             // ImagePanel 和滚动容器
-            _scrollContainer = new Panel
-            {
-                Dock = DockStyle.Fill,
-                AutoScroll = true,
-                AutoScrollMinSize = new Size(1, 1),
-                BackColor = Color.Black
-            };
+            _scrollContainer.Dock = DockStyle.Fill;
+            _scrollContainer.AutoScroll = true;
+            _scrollContainer.AutoScrollMinSize = new Size(1, 1);
+            _scrollContainer.BackColor = Color.Black;
+            _scrollContainer.Name = "_scrollContainer";
+
             _imagePanel.BackColor = Color.Black;
             _imagePanel.Name = "_imagePanel";
             _imagePanel.Size = new Size(698, 398);
             _imagePanel.TabIndex = 0;
-            _imagePanel.Paint += ImagePanel_Paint;
-            _imagePanel.MouseDown += ImagePanel_MouseDown;
-            _imagePanel.MouseMove += ImagePanel_MouseMove;
-            _imagePanel.MouseUp += ImagePanel_MouseUp;
-            _imagePanel.MouseClick += ImagePanel_MouseClick;
-            _imagePanel.MouseDoubleClick += ImagePanel_MouseDoubleClick;
-            _imagePanel.MouseEnter += ImagePanel_MouseEnter;
-            _imagePanel.MouseLeave += ImagePanel_MouseLeave;
-            _imagePanel.MouseWheel += ImagePanel_MouseWheel;
-            _imagePanel.KeyDown += ImagePanel_KeyDown;
-            _imagePanel.TabIndex = 0;
+            _imagePanel.Paint += new System.Windows.Forms.PaintEventHandler(this.ImagePanel_Paint);
+            _imagePanel.MouseDown += new System.Windows.Forms.MouseEventHandler(this.ImagePanel_MouseDown);
+            _imagePanel.MouseMove += new System.Windows.Forms.MouseEventHandler(this.ImagePanel_MouseMove);
+            _imagePanel.MouseUp += new System.Windows.Forms.MouseEventHandler(this.ImagePanel_MouseUp);
+            _imagePanel.MouseClick += new System.Windows.Forms.MouseEventHandler(this.ImagePanel_MouseClick);
+            _imagePanel.MouseDoubleClick += new System.Windows.Forms.MouseEventHandler(this.ImagePanel_MouseDoubleClick);
+            _imagePanel.MouseEnter += new System.EventHandler(this.ImagePanel_MouseEnter);
+            _imagePanel.MouseLeave += new System.EventHandler(this.ImagePanel_MouseLeave);
+            _imagePanel.MouseWheel += new System.Windows.Forms.MouseEventHandler(this.ImagePanel_MouseWheel);
+            _imagePanel.KeyDown += new System.Windows.Forms.KeyEventHandler(this.ImagePanel_KeyDown);
             _imagePanel.TabStop = true;
 
             // ListPanel
@@ -292,99 +417,61 @@ namespace LabelTool
             _verificationGroup.TabIndex = 0;
             _verificationGroup.TabStop = false;
             _verificationGroup.Text = "检测区域";
-            _verificationGroup.Height = 200;
 
             // Verification ListView
-            _verificationListView = new ListView
-            {
-                Dock = DockStyle.Fill,
-                FullRowSelect = true,
-                GridLines = true,
-                View = View.Details,
-                MultiSelect = false,
-                OwnerDraw = true
-            };
-            _verificationListView.Columns.Add("名称", 100);
-            _verificationListView.Columns.Add("位置", 150);
-            _verificationListView.Columns.Add("", 30);
-            _verificationListView.SelectedIndexChanged += VerificationListView_SelectedIndexChanged;
-            _verificationListView.MouseClick += VerificationListView_MouseClick;
-            _verificationListView.MouseDoubleClick += VerificationListView_MouseDoubleClick;
-            _verificationListView.DrawColumnHeader += ListView_DrawColumnHeader;
-            _verificationListView.DrawSubItem += VerificationListView_DrawSubItem;
+            _verificationListView.Dock = DockStyle.Fill;
+            _verificationListView.FullRowSelect = true;
+            _verificationListView.GridLines = true;
+            _verificationListView.View = View.Details;
+            _verificationListView.MultiSelect = false;
+            _verificationListView.OwnerDraw = true;
+            _verificationListView.Name = "_verificationListView";
+            _verificationListView.Columns.Add(_colName);
+            _verificationListView.Columns.Add(_colLocation);
+            _verificationListView.Columns.Add(_colAction);
+            _verificationListView.SelectedIndexChanged += new System.EventHandler(this.VerificationListView_SelectedIndexChanged);
+            _verificationListView.MouseClick += new System.Windows.Forms.MouseEventHandler(this.VerificationListView_MouseClick);
+            _verificationListView.MouseDoubleClick += new System.Windows.Forms.MouseEventHandler(this.VerificationListView_MouseDoubleClick);
+            _verificationListView.DrawColumnHeader += new System.Windows.Forms.DrawListViewColumnHeaderEventHandler(this.ListView_DrawColumnHeader);
+            _verificationListView.DrawSubItem += new System.Windows.Forms.DrawListViewSubItemEventHandler(this.VerificationListView_DrawSubItem);
             _verificationGroup.Controls.Add(_verificationListView);
 
             // CollectionGroup
             _collectionGroup.Dock = DockStyle.Fill;
             _collectionGroup.Name = "_collectionGroup";
-            _collectionGroup.Size = new Size(318, 110);
+            _collectionGroup.Size = new Size(318, 300);
             _collectionGroup.TabIndex = 1;
             _collectionGroup.TabStop = false;
             _collectionGroup.Text = "采集区域";
-            _collectionGroup.Height = 300;
 
             // Collection DataGridView
-            _collectionDataGridView = new DataGridView
-            {
-                Dock = DockStyle.Fill,
-                AllowUserToAddRows = false,
-                AllowUserToDeleteRows = false,
-                ReadOnly = true,
-                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-                MultiSelect = false,
-                RowHeadersVisible = false,
-                ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize,
-                BackgroundColor = Color.White,
-                BorderStyle = BorderStyle.None,
-                ColumnHeadersVisible = true,
-                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
-                ScrollBars = ScrollBars.Vertical
-            };
+            _collectionDataGridView.Dock = DockStyle.Fill;
+            _collectionDataGridView.AllowUserToAddRows = false;
+            _collectionDataGridView.AllowUserToDeleteRows = false;
+            _collectionDataGridView.ReadOnly = true;
+            _collectionDataGridView.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            _collectionDataGridView.MultiSelect = false;
+            _collectionDataGridView.RowHeadersVisible = false;
+            _collectionDataGridView.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            _collectionDataGridView.BackgroundColor = Color.White;
+            _collectionDataGridView.BorderStyle = BorderStyle.None;
+            _collectionDataGridView.ColumnHeadersVisible = true;
+            _collectionDataGridView.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None;
+            _collectionDataGridView.ScrollBars = ScrollBars.Vertical;
+            _collectionDataGridView.Name = "_collectionDataGridView";
 
             // 添加列：名称、位置、识别结果、展开按钮、删除
-            // 最小宽度计算：名称(50) + 位置(60) + 展开(30) + 删除(30) = 170px
-            var nameColumn = new DataGridViewTextBoxColumn
-            {
-                HeaderText = "名称",
-                Width = 100,
-                ReadOnly = true
-            };
-            var locationColumn = new DataGridViewTextBoxColumn
-            {
-                HeaderText = "位置",
-                Width = 120,
-                ReadOnly = true
-            };
-            var resultColumn = new DataGridViewTextBoxColumn
-            {
-                HeaderText = "识别结果",
-                AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill  // 自动填充剩余空间
-            };
-            var expandColumn = new DataGridViewButtonColumn
-            {
-                HeaderText = "",
-                Width = 30,
-                UseColumnTextForButtonValue = true,
-                Text = "...",
-                FlatStyle = FlatStyle.Popup,
-                Resizable = DataGridViewTriState.False
-            };
-            var deleteColumn = new DataGridViewButtonColumn
-            {
-                HeaderText = "",
-                Width = 30,
-                UseColumnTextForButtonValue = true,
-                Text = "×",
-                FlatStyle = FlatStyle.Popup,
-                Resizable = DataGridViewTriState.False
-            };
 
-            _collectionDataGridView.Columns.AddRange(nameColumn, locationColumn, resultColumn, expandColumn, deleteColumn);
-            _collectionDataGridView.CellPainting += CollectionDataGridView_CellPainting;  // 自定义绘制删除按钮
-            _collectionDataGridView.CellContentClick += CollectionDataGridView_CellContentClick;
-            _collectionDataGridView.CellMouseEnter += CollectionDataGridView_CellMouseEnter;
-            _collectionDataGridView.SelectionChanged += (s, e) => { _collectionDataGridView.ClearSelection(); };
-            _collectionDataGridView.MouseClick += CollectionDataGridView_MouseClick;
+            _collectionDataGridView.Columns.Add(_nameColumn);
+            _collectionDataGridView.Columns.Add(_locationColumn);
+            _collectionDataGridView.Columns.Add(_resultColumn);
+            _collectionDataGridView.Columns.Add(_expandColumn);
+            _collectionDataGridView.Columns.Add(_deleteColumn);
+            _collectionDataGridView.CellPainting += new System.Windows.Forms.DataGridViewCellPaintingEventHandler(this.CollectionDataGridView_CellPainting);
+            _collectionDataGridView.CellContentClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.CollectionDataGridView_CellContentClick);
+            _collectionDataGridView.CellMouseEnter += new System.Windows.Forms.DataGridViewCellEventHandler(this.CollectionDataGridView_CellMouseEnter);
+            _collectionDataGridView.SelectionChanged += new System.EventHandler(this.CollectionDataGridView_SelectionChanged);
+            _collectionDataGridView.MouseClick += new System.Windows.Forms.MouseEventHandler(this.CollectionDataGridView_MouseClick);
             _collectionGroup.Controls.Add(_collectionDataGridView);
 
             // Radio buttons
@@ -395,7 +482,7 @@ namespace LabelTool
             _radioVerificationArea.TabStop = true;
             _radioVerificationArea.Text = "检测区域";
             _radioVerificationArea.UseVisualStyleBackColor = true;
-            _radioVerificationArea.CheckedChanged += RadioVerificationArea_CheckedChanged;
+            _radioVerificationArea.CheckedChanged += new System.EventHandler(this.RadioVerificationArea_CheckedChanged);
 
             _radioCollectionArea.AutoSize = true;
             _radioCollectionArea.Name = "_radioCollectionArea";
@@ -404,10 +491,10 @@ namespace LabelTool
             _radioCollectionArea.TabStop = true;
             _radioCollectionArea.Text = "采集区域";
             _radioCollectionArea.UseVisualStyleBackColor = true;
-            _radioCollectionArea.CheckedChanged += RadioCollectionArea_CheckedChanged;
+            _radioCollectionArea.CheckedChanged += new System.EventHandler(this.RadioCollectionArea_CheckedChanged);
 
             // StatusStrip
-            _statusStrip.Items.AddRange(new ToolStripItem[] { _statusLabel });
+            _statusStrip.Items.Add(_statusLabel);
             _statusStrip.Location = new Point(0, 571);
             _statusStrip.Name = "_statusStrip";
             _statusStrip.Size = new Size(1024, 22);
@@ -419,27 +506,28 @@ namespace LabelTool
             _statusLabel.Text = "就绪";
 
             // ListPanel容器 - 包含GroupBox和RadioButton
-            var listContainer = new Panel { Dock = DockStyle.Fill };
+            var listContainer = new Panel();
+            listContainer.Dock = DockStyle.Fill;
+            listContainer.Name = "listContainer";
 
             // RadioButton Panel
-            var radioPanel = new Panel
-            {
-                Dock = DockStyle.Bottom,
-                Height = 35
-            };
-            _lblTabHint = new Label
-            {
-                Text = "Tab键切换",
-                Location = new Point(210, 6),
-                AutoSize = true,
-                ForeColor = Color.Fuchsia,
-                Font = new Font("Microsoft YaHei UI", 10F)
-            };
+            var radioPanel = new Panel();
+            radioPanel.Dock = DockStyle.Bottom;
+            radioPanel.Height = 35;
+            radioPanel.Name = "radioPanel";
+
+            _lblTabHint.Text = "Tab键切换";
+            _lblTabHint.Location = new Point(210, 6);
+            _lblTabHint.AutoSize = true;
+            _lblTabHint.ForeColor = Color.Fuchsia;
+            _lblTabHint.Font = new Font("Microsoft YaHei UI", 10F);
+
+            _radioVerificationArea.Location = new Point(10, 8);
+            _radioCollectionArea.Location = new Point(120, 8);
+
             radioPanel.Controls.Add(_lblTabHint);
             radioPanel.Controls.Add(_radioVerificationArea);
             radioPanel.Controls.Add(_radioCollectionArea);
-            _radioVerificationArea.Location = new Point(10, 8);
-            _radioCollectionArea.Location = new Point(120, 8);
 
             listContainer.Controls.Add(_collectionGroup);
             listContainer.Controls.Add(_verificationGroup);
@@ -448,7 +536,6 @@ namespace LabelTool
             _verificationGroup.Location = new Point(0, 0);
             _collectionGroup.Location = new Point(0, 200);
             _listPanel.Controls.Add(listContainer);
-            listContainer.Dock = DockStyle.Fill;
 
             // FormMain
             AutoScaleDimensions = new SizeF(6F, 12F);
@@ -460,6 +547,14 @@ namespace LabelTool
             Name = "FormMain";
             StartPosition = FormStartPosition.CenterScreen;
             Text = Title;
+
+            ResumeLayout(false);
+            PerformLayout();
+        }
+
+        private void CollectionDataGridView_SelectionChanged(object sender, System.EventArgs e)
+        {
+            _collectionDataGridView.ClearSelection();
         }
 
         protected override void Dispose(bool disposing)

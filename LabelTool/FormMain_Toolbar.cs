@@ -68,6 +68,19 @@ namespace LabelTool
                 "关于", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
+        private void BtnSettings_Click(object sender, EventArgs e)
+        {
+            using (var form = new FormSettings())
+            {
+                if (form.ShowDialog() == DialogResult.OK)
+                {
+                    _statusLabel.Text = "配置已更新";
+                    // 重新加载可用Topic
+                    LoadAvailableTopics();
+                }
+            }
+        }
+
         private void ThresholdComboBox_SelectedIndexChanged(object sender, EventArgs e)
         {
             if (_thresholdComboBox.SelectedItem != null)
