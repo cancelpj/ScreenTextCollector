@@ -9,6 +9,49 @@ namespace LabelTool
     {
         #region 工具栏事件
 
+        private void ScreenComboBox_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (_screenComboBox.SelectedIndex < 0) return;
+
+            // 从 _capturedScreenNumbers 中获取屏幕编号
+            int screenNumber = _capturedScreenNumbers[_screenComboBox.SelectedIndex];
+            SwitchScreen(screenNumber);
+        }
+
+        private void ScreenComboBox_DropDown(object sender, EventArgs e)
+        {
+            var combo = _screenComboBox.ComboBox;
+            if (combo == null || combo.Items.Count == 0) return;
+
+            int maxWidth = combo.Width;
+            using (Graphics g = combo.CreateGraphics())
+            {
+                foreach (var item in combo.Items)
+                {
+                    int itemWidth = (int)g.MeasureString(item.ToString(), combo.Font).Width;
+                    if (itemWidth > maxWidth)
+                        maxWidth = itemWidth;
+                }
+            }
+            combo.DropDownWidth = maxWidth + 10;
+        }
+
+        private void RadioVerificationArea_CheckedChanged(object sender, EventArgs e)
+        {
+            if (_radioVerificationArea.Checked)
+            {
+                _isVerificationAreaMode = true;
+            }
+        }
+
+        private void RadioCollectionArea_CheckedChanged(object sender, EventArgs e)
+        {
+            if (_radioCollectionArea.Checked)
+            {
+                _isVerificationAreaMode = false;
+            }
+        }
+
         private void BtnCapture_Click(object sender, EventArgs e)
         {
             var configPath = GetConfigPath();
@@ -28,17 +71,14 @@ namespace LabelTool
 
                 // 清理旧配置
                 DeleteOldConfig();
-
-                // 清空内存中的区域列表
-                _verificationAreas.Clear();
-                _collectionAreas.Clear();
-                _selectedVerificationIndex = -1;
-                _selectedCollectionIndex = -1;
-
-                // 刷新列表显示
-                RefreshVerificationList();
-                RefreshCollectionList();
             }
+
+            // 清空内存中的区域列表和截图
+            ClearAllData();
+
+            // 刷新列表显示
+            RefreshVerificationList();
+            RefreshCollectionList();
 
             // 开始新的截屏流程
             SelectScreenAndCapture(sender, e);
@@ -96,12 +136,12 @@ namespace LabelTool
 
         private void BtnOcrTest_Click(object sender, EventArgs e)
         {
-            if (_screenshot == null)
+            if (GetCurrentScreenshot() == null)
             {
                 MessageBox.Show("请先进行截屏。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
-            if (_collectionAreas.Count == 0)
+            if (GetCurrentCollectionAreas().Count == 0)
             {
                 MessageBox.Show("请先添加采集区域。", "提示", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
@@ -128,7 +168,8 @@ namespace LabelTool
 
         private void CmbZoomLevel_TextChanged(object sender, EventArgs e)
         {
-            if (_isAutoZoom || _screenshot == null || _isUpdatingZoomLevel) return;
+            var screenshot = GetCurrentScreenshot();
+            if (_isAutoZoom || screenshot == null || _isUpdatingZoomLevel) return;
 
             string text = _cmbZoomLevel.Text.TrimEnd('%', ' ');
             if (float.TryParse(text, out float percent))
@@ -156,9 +197,10 @@ namespace LabelTool
         private void UpdateScrollSize()
         {
             // 更新滚动容器的内容尺寸（不触发重绘，由调用方决定何时刷新）
-            if (_screenshot == null) return;
-            int w = (int)(_screenshot.Width * _zoomLevel);
-            int h = (int)(_screenshot.Height * _zoomLevel);
+            var screenshot = GetCurrentScreenshot();
+            if (screenshot == null) return;
+            int w = (int)(screenshot.Width * _zoomLevel);
+            int h = (int)(screenshot.Height * _zoomLevel);
             _imagePanel.Size = new Size(w, h);
             _scrollContainer.AutoScrollMinSize = new Size(w, h);
         }

@@ -1,23 +1,25 @@
 using System;
-using System.Drawing;
+using System.Collections.Generic;
 using System.Windows.Forms;
 
 namespace LabelTool
 {
     /// <summary>
-    /// 屏幕选择对话框
+    /// 屏幕选择对话框（支持多选）
     /// </summary>
     public class FormScreenSelect : Form
     {
         private Label _lblTitle;
-        private ListBox _screenListBox;
+        private CheckedListBox _screenCheckedListBox;
+        private Button _btnSelectAll;
+        private Button _btnDeselectAll;
         private Button _btnOk;
         private Button _btnCancel;
 
         /// <summary>
-        /// 用户选择的屏幕编号
+        /// 用户选择的屏幕编号列表
         /// </summary>
-        public int SelectedScreenNumber { get; private set; }
+        public List<int> SelectedScreenNumbers { get; private set; } = new List<int>();
 
         public FormScreenSelect()
         {
@@ -28,7 +30,9 @@ namespace LabelTool
         private void InitializeComponent()
         {
             this._lblTitle = new System.Windows.Forms.Label();
-            this._screenListBox = new System.Windows.Forms.ListBox();
+            this._screenCheckedListBox = new System.Windows.Forms.CheckedListBox();
+            this._btnSelectAll = new System.Windows.Forms.Button();
+            this._btnDeselectAll = new System.Windows.Forms.Button();
             this._btnOk = new System.Windows.Forms.Button();
             this._btnCancel = new System.Windows.Forms.Button();
             this.SuspendLayout();
@@ -39,38 +43,56 @@ namespace LabelTool
             this._lblTitle.Font = new System.Drawing.Font("Microsoft Sans Serif", 10F, System.Drawing.FontStyle.Bold);
             this._lblTitle.Location = new System.Drawing.Point(20, 20);
             this._lblTitle.Name = "_lblTitle";
-            this._lblTitle.Size = new System.Drawing.Size(158, 17);
+            this._lblTitle.Size = new System.Drawing.Size(188, 17);
             this._lblTitle.TabIndex = 0;
-            this._lblTitle.Text = "请选择要采集的屏幕：";
+            this._lblTitle.Text = "请选择要截取的屏幕（可多选）：";
             //
-            // _screenListBox
+            // _screenCheckedListBox
             //
-            this._screenListBox.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
-            this._screenListBox.ItemHeight = 15;
-            this._screenListBox.Location = new System.Drawing.Point(20, 50);
-            this._screenListBox.Name = "_screenListBox";
-            this._screenListBox.Size = new System.Drawing.Size(340, 214);
-            this._screenListBox.TabIndex = 1;
-            this._screenListBox.DoubleClick += ScreenListBox_DoubleClick;
-            this._screenListBox.KeyDown += ScreenListBox_KeyDown;
+            this._screenCheckedListBox.CheckOnClick = true;
+            this._screenCheckedListBox.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this._screenCheckedListBox.Location = new System.Drawing.Point(20, 50);
+            this._screenCheckedListBox.Name = "_screenCheckedListBox";
+            this._screenCheckedListBox.Size = new System.Drawing.Size(340, 154);
+            this._screenCheckedListBox.TabIndex = 1;
+            //
+            // _btnSelectAll
+            //
+            this._btnSelectAll.Location = new System.Drawing.Point(20, 215);
+            this._btnSelectAll.Name = "_btnSelectAll";
+            this._btnSelectAll.Size = new System.Drawing.Size(80, 25);
+            this._btnSelectAll.TabIndex = 2;
+            this._btnSelectAll.Text = "全选";
+            this._btnSelectAll.UseVisualStyleBackColor = true;
+            this._btnSelectAll.Click += BtnSelectAll_Click;
+            //
+            // _btnDeselectAll
+            //
+            this._btnDeselectAll.Location = new System.Drawing.Point(110, 215);
+            this._btnDeselectAll.Name = "_btnDeselectAll";
+            this._btnDeselectAll.Size = new System.Drawing.Size(80, 25);
+            this._btnDeselectAll.TabIndex = 3;
+            this._btnDeselectAll.Text = "取消全选";
+            this._btnDeselectAll.UseVisualStyleBackColor = true;
+            this._btnDeselectAll.Click += BtnDeselectAll_Click;
             //
             // _btnOk
             //
             this._btnOk.DialogResult = System.Windows.Forms.DialogResult.OK;
-            this._btnOk.Location = new System.Drawing.Point(200, 276);
+            this._btnOk.Location = new System.Drawing.Point(200, 251);
             this._btnOk.Name = "_btnOk";
             this._btnOk.Size = new System.Drawing.Size(75, 30);
-            this._btnOk.TabIndex = 2;
+            this._btnOk.TabIndex = 4;
             this._btnOk.Text = "确定";
             this._btnOk.Click += BtnOk_Click;
             //
             // _btnCancel
             //
             this._btnCancel.DialogResult = System.Windows.Forms.DialogResult.Cancel;
-            this._btnCancel.Location = new System.Drawing.Point(285, 276);
+            this._btnCancel.Location = new System.Drawing.Point(285, 251);
             this._btnCancel.Name = "_btnCancel";
             this._btnCancel.Size = new System.Drawing.Size(75, 30);
-            this._btnCancel.TabIndex = 3;
+            this._btnCancel.TabIndex = 5;
             this._btnCancel.Text = "取消";
             this._btnCancel.Click += BtnCancel_Click;
             //
@@ -78,9 +100,11 @@ namespace LabelTool
             //
             this.BackColor = System.Drawing.Color.White;
             this.CancelButton = this._btnCancel;
-            this.ClientSize = new System.Drawing.Size(420, 340);
+            this.ClientSize = new System.Drawing.Size(420, 320);
             this.Controls.Add(this._lblTitle);
-            this.Controls.Add(this._screenListBox);
+            this.Controls.Add(this._screenCheckedListBox);
+            this.Controls.Add(this._btnSelectAll);
+            this.Controls.Add(this._btnDeselectAll);
             this.Controls.Add(this._btnOk);
             this.Controls.Add(this._btnCancel);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
@@ -93,7 +117,6 @@ namespace LabelTool
             this.KeyDown += FormScreenSelect_KeyDown;
             this.ResumeLayout(false);
             this.PerformLayout();
-
         }
 
         private void LoadScreens()
@@ -114,59 +137,55 @@ namespace LabelTool
                     displayName = $"屏幕 {i}: {screen.DeviceName} ({screen.Bounds.Width}x{screen.Bounds.Height})";
                 }
 
-                _screenListBox.Items.Add(displayName);
-            }
-
-            // 默认选择主屏幕（索引0）
-            if (_screenListBox.Items.Count > 0)
-            {
-                _screenListBox.SelectedIndex = 0;
+                _screenCheckedListBox.Items.Add(displayName, true); // 默认全选
             }
         }
 
-        private void ScreenListBox_DoubleClick(object sender, EventArgs e)
+        private void BtnSelectAll_Click(object sender, EventArgs e)
         {
-            // 双击选择后确定
-            BtnOk_Click(sender, e);
-            this.DialogResult = DialogResult.OK;
-            this.Close();
+            for (int i = 0; i < _screenCheckedListBox.Items.Count; i++)
+            {
+                _screenCheckedListBox.SetItemChecked(i, true);
+            }
         }
 
-        private void ScreenListBox_KeyDown(object sender, KeyEventArgs e)
+        private void BtnDeselectAll_Click(object sender, EventArgs e)
         {
-            // 回车键确定
-            if (e.KeyCode == Keys.Enter)
+            for (int i = 0; i < _screenCheckedListBox.Items.Count; i++)
             {
-                BtnOk_Click(sender, e);
-                this.DialogResult = DialogResult.OK;
-                this.Close();
+                _screenCheckedListBox.SetItemChecked(i, false);
             }
         }
 
         private void BtnOk_Click(object sender, EventArgs e)
         {
-            if (_screenListBox.SelectedIndex >= 0)
+            SelectedScreenNumbers.Clear();
+            for (int i = 0; i < _screenCheckedListBox.Items.Count; i++)
             {
-                SelectedScreenNumber = _screenListBox.SelectedIndex;
+                if (_screenCheckedListBox.GetItemChecked(i))
+                {
+                    SelectedScreenNumbers.Add(i);
+                }
             }
-            else
+
+            // 如果没有选择任何屏幕，默认选择主屏幕（索引0）
+            if (SelectedScreenNumbers.Count == 0 && _screenCheckedListBox.Items.Count > 0)
             {
-                SelectedScreenNumber = 0; // 默认使用主屏幕
+                SelectedScreenNumbers.Add(0);
             }
         }
 
         private void BtnCancel_Click(object sender, EventArgs e)
         {
-            // 取消时关闭整个程序
-            //Application.Exit();
+            // 取消
         }
 
-        private void FormScreenSelect_KeyDown(object sender, KeyEventArgs e)
+        private void FormScreenSelect_KeyDown(object sender, System.Windows.Forms.KeyEventArgs e)
         {
-            // ESC键取消，只关闭对话框，不退出程序
+            // ESC键取消
             if (e.KeyCode == Keys.Escape)
             {
-                this.DialogResult = DialogResult.Cancel;
+                this.DialogResult = System.Windows.Forms.DialogResult.Cancel;
                 this.Close();
             }
         }

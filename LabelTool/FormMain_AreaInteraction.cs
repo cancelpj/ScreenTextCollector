@@ -7,11 +7,16 @@ namespace LabelTool
 {
     public partial class FormMain
     {
+        /// <summary>
+        /// 最小区域尺寸（像素）
+        /// </summary>
+        private const int MinAreaSize = 10;
+
         #region 鼠标拖拽框选
 
         private void ImagePanel_MouseDown(object sender, MouseEventArgs e)
         {
-            if (_screenshot == null) return;
+            if (GetCurrentScreenshot() == null) return;
 
             // 聚焦到图片面板以接收键盘事件
             _imagePanel.Focus();
@@ -28,16 +33,19 @@ namespace LabelTool
 
             var (scaleX, scaleY, offsetX, offsetY) = GetImageTransform();
 
+            var currentVerificationAreas = GetCurrentVerificationAreas();
+            var currentCollectionAreas = GetCurrentCollectionAreas();
+
             // 确保选中索引有效
-            if (_selectedVerificationIndex >= _verificationAreas.Count)
+            if (_selectedVerificationIndex >= currentVerificationAreas.Count)
                 _selectedVerificationIndex = -1;
-            if (_selectedCollectionIndex >= _collectionAreas.Count)
+            if (_selectedCollectionIndex >= currentCollectionAreas.Count)
                 _selectedCollectionIndex = -1;
 
             // 检查是否点击了选中区域的边缘（缩放）或内部（移动）
             if (_selectedVerificationIndex >= 0)
             {
-                var area = _verificationAreas[_selectedVerificationIndex];
+                var area = currentVerificationAreas[_selectedVerificationIndex];
                 var panelRect = ImageToPanelRect(new VerificationAreaAdapter(area));
                 int handle = GetResizeHandle(panelRect, e.Location);
 
@@ -55,7 +63,7 @@ namespace LabelTool
             }
             else if (_selectedCollectionIndex >= 0)
             {
-                var area = _collectionAreas[_selectedCollectionIndex];
+                var area = currentCollectionAreas[_selectedCollectionIndex];
                 var panelRect = ImageToPanelRect(new CollectionAreaAdapter(area));
                 int handle = GetResizeHandle(panelRect, e.Location);
 
@@ -86,7 +94,7 @@ namespace LabelTool
 
         private void ImagePanel_MouseMove(object sender, MouseEventArgs e)
         {
-            if (_screenshot == null) return;
+            if (GetCurrentScreenshot() == null) return;
 
             // 平移（使用滚动条实现）
             if (_isPanning)
@@ -105,14 +113,18 @@ namespace LabelTool
             int deltaImgX = (int)((e.Location.X - _dragStart.X) / scaleX);
             int deltaImgY = (int)((e.Location.Y - _dragStart.Y) / scaleY);
 
-            if (_screenshot == null || !_isDragging) return;
+            var screenshot = GetCurrentScreenshot();
+            if (screenshot == null || !_isDragging) return;
+
+            var currentVerificationAreas = GetCurrentVerificationAreas();
+            var currentCollectionAreas = GetCurrentCollectionAreas();
 
             if (_isDraggingArea)
             {
                 // 拖拽移动选中区域
                 if (_selectedVerificationIndex >= 0)
                 {
-                    var area = _verificationAreas[_selectedVerificationIndex];
+                    var area = currentVerificationAreas[_selectedVerificationIndex];
                     area.TopLeftX += deltaImgX;
                     area.TopLeftY += deltaImgY;
                     _isModify = true;
@@ -120,7 +132,7 @@ namespace LabelTool
                 }
                 else if (_selectedCollectionIndex >= 0)
                 {
-                    var area = _collectionAreas[_selectedCollectionIndex];
+                    var area = currentCollectionAreas[_selectedCollectionIndex];
                     area.TopLeftX += deltaImgX;
                     area.TopLeftY += deltaImgY;
                     _isModify = true;
@@ -134,14 +146,14 @@ namespace LabelTool
                 // 缩放选中区域
                 if (_selectedVerificationIndex >= 0)
                 {
-                    var area = _verificationAreas[_selectedVerificationIndex];
+                    var area = currentVerificationAreas[_selectedVerificationIndex];
                     ResizeArea(new VerificationAreaAdapter(area), _resizeHandle, deltaImgX, deltaImgY);
                     _isModify = true;
                     RefreshVerificationList();
                 }
                 else if (_selectedCollectionIndex >= 0)
                 {
-                    var area = _collectionAreas[_selectedCollectionIndex];
+                    var area = currentCollectionAreas[_selectedCollectionIndex];
                     ResizeArea(new CollectionAreaAdapter(area), _resizeHandle, deltaImgX, deltaImgY);
                     _isModify = true;
                     RefreshCollectionList();
@@ -163,7 +175,7 @@ namespace LabelTool
         /// </summary>
         private void ImagePanel_MouseEnter(object sender, EventArgs e)
         {
-            if (_screenshot == null) return;
+            if (GetCurrentScreenshot() == null) return;
             var pos = _imagePanel.PointToClient(Cursor.Position);
             UpdateCursorForResizeHandles(pos);
         }
@@ -181,7 +193,7 @@ namespace LabelTool
         /// </summary>
         private void ImagePanel_MouseWheel(object sender, MouseEventArgs e)
         {
-            if (_screenshot == null || _isAutoZoom) return;
+            if (GetCurrentScreenshot() == null || _isAutoZoom) return;
 
             // 计算缩放步进
             float oldZoom = _zoomLevel;
@@ -200,7 +212,7 @@ namespace LabelTool
 
         private void ImagePanel_MouseUp(object sender, MouseEventArgs e)
         {
-            if (_screenshot == null) return;
+            if (GetCurrentScreenshot() == null) return;
 
             // 结束平移（右键）
             if (e.Button == MouseButtons.Right)
@@ -231,7 +243,7 @@ namespace LabelTool
             _isDragging = false;
 
             // 确保矩形有效
-            if (_currentRect.Width > 10 && _currentRect.Height > 10)
+            if (_currentRect.Width > MinAreaSize && _currentRect.Height > MinAreaSize)
             {
                 // 弹出对话框确认区域属性
                 ShowAreaDialog(_currentRect);
@@ -242,7 +254,7 @@ namespace LabelTool
 
         private void ImagePanel_MouseClick(object sender, MouseEventArgs e)
         {
-            if (_screenshot == null) return;
+            if (GetCurrentScreenshot() == null) return;
 
             // 检查是否点击了已有区域
             var clickPoint = e.Location;
@@ -252,10 +264,13 @@ namespace LabelTool
             int imgX = imgPoint.X;
             int imgY = imgPoint.Y;
 
+            var currentVerificationAreas = GetCurrentVerificationAreas();
+            var currentCollectionAreas = GetCurrentCollectionAreas();
+
             // 检查检测区域
-            for (int i = 0; i < _verificationAreas.Count; i++)
+            for (int i = 0; i < currentVerificationAreas.Count; i++)
             {
-                var area = _verificationAreas[i];
+                var area = currentVerificationAreas[i];
                 var rect = new Rectangle(area.TopLeftX, area.TopLeftY, area.Width, area.Height);
                 if (rect.Contains(imgX, imgY))
                 {
@@ -269,9 +284,9 @@ namespace LabelTool
             }
 
             // 检查采集区域
-            for (int i = 0; i < _collectionAreas.Count; i++)
+            for (int i = 0; i < currentCollectionAreas.Count; i++)
             {
-                var area = _collectionAreas[i];
+                var area = currentCollectionAreas[i];
                 var rect = new Rectangle(area.TopLeftX, area.TopLeftY, area.Width, area.Height);
                 if (rect.Contains(imgX, imgY))
                 {
@@ -356,8 +371,8 @@ namespace LabelTool
                     break;
             }
             // 确保尺寸有效
-            if (adapter.Width < 10) adapter.Width = 10;
-            if (adapter.Height < 10) adapter.Height = 10;
+            if (adapter.Width < MinAreaSize) adapter.Width = MinAreaSize;
+            if (adapter.Height < MinAreaSize) adapter.Height = MinAreaSize;
         }
 
         /// <summary>
@@ -365,12 +380,15 @@ namespace LabelTool
         /// </summary>
         private void ImagePanel_MouseDoubleClick(object sender, MouseEventArgs e)
         {
-            if (_screenshot == null) return;
+            if (GetCurrentScreenshot() == null) return;
+
+            var currentVerificationAreas = GetCurrentVerificationAreas();
+            var currentCollectionAreas = GetCurrentCollectionAreas();
 
             // 检查是否点击了检测区域
-            for (int i = 0; i < _verificationAreas.Count; i++)
+            for (int i = 0; i < currentVerificationAreas.Count; i++)
             {
-                var area = _verificationAreas[i];
+                var area = currentVerificationAreas[i];
                 var panelRect = ImageToPanelRect(new VerificationAreaAdapter(area));
                 if (panelRect.Contains(e.Location))
                 {
@@ -380,9 +398,9 @@ namespace LabelTool
             }
 
             // 检查是否点击了采集区域
-            for (int i = 0; i < _collectionAreas.Count; i++)
+            for (int i = 0; i < currentCollectionAreas.Count; i++)
             {
-                var area = _collectionAreas[i];
+                var area = currentCollectionAreas[i];
                 var panelRect = ImageToPanelRect(new CollectionAreaAdapter(area));
                 if (panelRect.Contains(e.Location))
                 {
@@ -417,9 +435,10 @@ namespace LabelTool
         /// </summary>
         private void EditVerificationArea(int index)
         {
-            if (index < 0 || index >= _verificationAreas.Count) return;
+            var currentAreas = GetCurrentVerificationAreas();
+            if (index < 0 || index >= currentAreas.Count) return;
 
-            var area = _verificationAreas[index];
+            var area = currentAreas[index];
             var dialog = new FormAreaDialog(true, area.MatchThreshold, Path.GetFileNameWithoutExtension(area.FileName), area.TopLeftX, area.TopLeftY, area.Width, area.Height);
             dialog.ValidateName = name =>
             {
@@ -433,7 +452,7 @@ namespace LabelTool
                 area.TopLeftY = dialog.AreaY;
                 area.Width = dialog.AreaWidth;
                 area.Height = dialog.AreaHeight;
-                area.FileName = dialog.AreaName + ".png";
+                area.FileName = $"{dialog.AreaName}.png";
                 area.MatchThreshold = dialog.MatchThreshold;
                 _isModify = true;
                 RefreshVerificationList();
@@ -446,9 +465,10 @@ namespace LabelTool
         /// </summary>
         private void EditCollectionArea(int index)
         {
-            if (index < 0 || index >= _collectionAreas.Count) return;
+            var currentAreas = GetCurrentCollectionAreas();
+            if (index < 0 || index >= currentAreas.Count) return;
 
-            var area = _collectionAreas[index];
+            var area = currentAreas[index];
             var dialog = new FormAreaDialog(false, 0.8f, area.Name, area.TopLeftX, area.TopLeftY, area.Width, area.Height, area.Topic, _availableTopics)
             {
                 ValidateName = name =>
@@ -470,6 +490,38 @@ namespace LabelTool
                 RefreshCollectionList();
                 _imagePanel.Invalidate();
             }
+        }
+
+        /// <summary>
+        /// 检查验证区域名称是否重复（排除自身）
+        /// </summary>
+        private bool IsVerificationNameDuplicate(string name, int excludeIndex)
+        {
+            foreach (var areas in _screenVerificationAreas.Values)
+            {
+                for (int i = 0; i < areas.Count; i++)
+                {
+                    if (i != excludeIndex && Path.GetFileNameWithoutExtension(areas[i].FileName) == name)
+                        return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 检查采集区域名称是否重复（排除自身）
+        /// </summary>
+        private bool IsCollectionNameDuplicate(string name, int excludeIndex)
+        {
+            foreach (var areas in _screenCollectionAreas.Values)
+            {
+                for (int i = 0; i < areas.Count; i++)
+                {
+                    if (i != excludeIndex && areas[i].Name == name)
+                        return true;
+                }
+            }
+            return false;
         }
 
         #endregion

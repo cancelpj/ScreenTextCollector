@@ -38,18 +38,17 @@ namespace ScreenTextCollector
 
                     while (!cancellationToken.IsCancellationRequested)
                     {
-                        var collectRet = Tool.CaptureAndVerify(
-                            OcrService.VerifyImage,
-                            Tool.CaptureSettings.VerificationAreas);
+                        // 多屏幕批量采集（包含图像校验）
+                        var collectRet = Tool.ProcessMultiScreenCapture(OcrService.PerformOcr, OcrService.VerifyImage);
 
                         if (collectRet.ResultType != MethodResultType.Success)
                         {
-                            // 验证失败，跳过本次推送
+                            // 采集失败，跳过本次推送
                             Tool.Log.Warn($"{DateTime.Now} 采集异常，跳过本次推送: {collectRet.Message}\n");
                         }
                         else
                         {
-                            var ocrRet = Tool.ProcessScreenCaptureWithTopic(collectRet.Message, OcrService.PerformOcr);
+                            var ocrRet = collectRet;
 
                             if (ocrRet.ResultType == MethodResultType.Success)
                             {

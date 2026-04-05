@@ -9,7 +9,7 @@
     <StartupObject />
   </PropertyGroup>
   <ItemGroup>
-    <None Update="appsettings.json">
+    <None Update="data\appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Update="NLog.config">

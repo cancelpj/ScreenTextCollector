@@ -26,7 +26,7 @@ namespace LabelTool
             if (_isVerificationAreaMode)
             {
                 // 检测区域
-                string defaultName = $"检测区域{_verificationAreas.Count + 1}";
+                string defaultName = $"{_currentScreenNumber}_检测区域{GetCurrentVerificationAreas().Count + 1}";
                 var dialog = new FormAreaDialog(true, _matchThreshold, defaultName, imgX, imgY, imgWidth, imgHeight);
                 dialog.ValidateName = name =>
                 {
@@ -38,14 +38,15 @@ namespace LabelTool
                 {
                     var area = new ImageVerificationArea
                     {
+                        ScreenNumber = _currentScreenNumber, // 关联当前屏幕
                         TopLeftX = imgX,
                         TopLeftY = imgY,
                         Width = imgWidth,
                         Height = imgHeight,
-                        FileName = dialog.AreaName + ".png",
+                        FileName = $"{dialog.AreaName}.png",
                         MatchThreshold = dialog.MatchThreshold
                     };
-                    _verificationAreas.Add(area);
+                    GetCurrentVerificationAreas().Add(area);
                     _isModify = true;
 
                     // 保存检测区域截图
@@ -59,7 +60,7 @@ namespace LabelTool
             else
             {
                 // 采集区域
-                string defaultName = $"采集区域{_collectionAreas.Count + 1}";
+                string defaultName = $"{_currentScreenNumber}_采集区域{GetCurrentCollectionAreas().Count + 1}";
                 var dialog = new FormAreaDialog(false, _matchThreshold, defaultName, imgX, imgY, imgWidth, imgHeight, "", _availableTopics);
                 dialog.ValidateName = name =>
                 {
@@ -71,6 +72,7 @@ namespace LabelTool
                 {
                     var area = new ImageCollectionArea
                     {
+                        ScreenNumber = _currentScreenNumber, // 关联当前屏幕
                         Name = dialog.AreaName,
                         TopLeftX = imgX,
                         TopLeftY = imgY,
@@ -78,7 +80,7 @@ namespace LabelTool
                         Height = imgHeight,
                         Topic = dialog.Topic
                     };
-                    _collectionAreas.Add(area);
+                    GetCurrentCollectionAreas().Add(area);
                     _isModify = true;
 
                     RefreshCollectionList();
@@ -92,6 +94,13 @@ namespace LabelTool
         {
             try
             {
+                var screenshot = GetCurrentScreenshot();
+                if (screenshot == null)
+                {
+                    MessageBox.Show("当前没有截图，无法保存检测图片。", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
                 var dataDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data");
                 if (!Directory.Exists(dataDir))
                 {
@@ -100,7 +109,7 @@ namespace LabelTool
 
                 var filePath = Path.Combine(dataDir, area.FileName);
                 var rect = new Rectangle(area.TopLeftX, area.TopLeftY, area.Width, area.Height);
-                using (var cropped = _screenshot.Clone(rect, _screenshot.PixelFormat))
+                using (var cropped = screenshot.Clone(rect, screenshot.PixelFormat))
                 {
                     cropped.Save(filePath);
                 }
@@ -113,22 +122,80 @@ namespace LabelTool
 
         #endregion
 
-        #region 切换选择区域单选按钮
+        #region 辅助方法：截图和区域数据清理
 
-        private void RadioVerificationArea_CheckedChanged(object sender, EventArgs e)
+        /// <summary>
+        /// 释放并清空所有屏幕截图
+        /// </summary>
+        private void ClearAllScreenshots()
         {
-            if (_radioVerificationArea.Checked)
+            foreach (var screenshot in _screenScreenshots.Values)
             {
-                _isVerificationAreaMode = true;
+                screenshot?.Dispose();
             }
+            _screenScreenshots.Clear();
         }
 
-        private void RadioCollectionArea_CheckedChanged(object sender, EventArgs e)
+        /// <summary>
+        /// 清空所有数据（截图+区域+选中状态）
+        /// </summary>
+        private void ClearAllData()
         {
-            if (_radioCollectionArea.Checked)
+            ClearAllScreenshots();
+            _screenVerificationAreas.Clear();
+            _screenCollectionAreas.Clear();
+            _selectedVerificationIndex = -1;
+            _selectedCollectionIndex = -1;
+        }
+
+        /// <summary>
+        /// 获取当前屏幕的验证区域列表
+        /// </summary>
+        private List<ImageVerificationArea> GetCurrentVerificationAreas()
+        {
+            if (!_screenVerificationAreas.ContainsKey(_currentScreenNumber))
             {
-                _isVerificationAreaMode = false;
+                _screenVerificationAreas[_currentScreenNumber] = new List<ImageVerificationArea>();
             }
+            return _screenVerificationAreas[_currentScreenNumber];
+        }
+
+        /// <summary>
+        /// 获取当前屏幕的采集区域列表
+        /// </summary>
+        private List<ImageCollectionArea> GetCurrentCollectionAreas()
+        {
+            if (!_screenCollectionAreas.ContainsKey(_currentScreenNumber))
+            {
+                _screenCollectionAreas[_currentScreenNumber] = new List<ImageCollectionArea>();
+            }
+            return _screenCollectionAreas[_currentScreenNumber];
+        }
+
+        /// <summary>
+        /// 检查验证区域名称是否重复
+        /// </summary>
+        private bool IsVerificationNameDuplicate(string name)
+        {
+            foreach (var areas in _screenVerificationAreas.Values)
+            {
+                if (areas.Any(a => Path.GetFileNameWithoutExtension(a.FileName) == name))
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 检查采集区域名称是否重复
+        /// </summary>
+        private bool IsCollectionNameDuplicate(string name)
+        {
+            foreach (var areas in _screenCollectionAreas.Values)
+            {
+                if (areas.Any(a => a.Name == name))
+                    return true;
+            }
+            return false;
         }
 
         #endregion
@@ -145,6 +212,11 @@ namespace LabelTool
             return Path.Combine(GetDataDir(), "CaptureSettings.json");
         }
 
+        private string GetScreenshotPath(int screenNumber)
+        {
+            return Path.Combine(GetDataDir(), $"screenshot_{screenNumber}.png");
+        }
+
         private Image LoadIconFromResources(string resourcesDir, string fileName)
         {
             var path = Path.Combine(resourcesDir, fileName);
@@ -156,17 +228,11 @@ namespace LabelTool
             return null;
         }
 
-        private string GetScreenshotPath()
-        {
-            return Path.Combine(GetDataDir(), "screenshot.png");
-        }
-
         private void DeleteOldConfig()
         {
             try
             {
                 var configPath = GetConfigPath();
-                var screenshotPath = GetScreenshotPath();
                 var dataDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data");
 
                 // 删除配置文件
@@ -175,10 +241,11 @@ namespace LabelTool
                     File.Delete(configPath);
                 }
 
-                // 删除截图文件
-                if (File.Exists(screenshotPath))
+                // 删除所有截图文件
+                var screenshotFiles = Directory.GetFiles(dataDir, "screenshot_*.png");
+                foreach (var file in screenshotFiles)
                 {
-                    File.Delete(screenshotPath);
+                    File.Delete(file);
                 }
 
                 // 删除 data 目录中的模板图片
@@ -186,6 +253,8 @@ namespace LabelTool
                 {
                     Directory.Delete(dataDir, true);
                 }
+
+                ClearAllData();
 
                 _statusLabel.Text = "已清除旧配置";
             }
@@ -195,26 +264,27 @@ namespace LabelTool
             }
         }
 
-        private void LoadScreenshot(string path)
+        private void LoadScreenshot(int screenNumber)
         {
             try
             {
-                if (File.Exists(path))
+                var screenshotPath = GetScreenshotPath(screenNumber);
+                if (File.Exists(screenshotPath))
                 {
-                    _screenshot?.Dispose();
-                    // 先从文件读取，然后用克隆创建新Bitmap以释放文件锁
-                    using (var tempBmp = new Bitmap(path))
+                    if (_screenScreenshots.ContainsKey(screenNumber))
                     {
-                        _screenshot = new Bitmap(tempBmp);
+                        _screenScreenshots[screenNumber]?.Dispose();
                     }
-                    UpdateScrollSize();
-                    _imagePanel.Invalidate();
-                    _statusLabel.Text = $"截图已加载: {_screenshot.Width}x{_screenshot.Height}";
+                    // 先从文件读取，然后用克隆创建新Bitmap以释放文件锁
+                    using (var tempBmp = new Bitmap(screenshotPath))
+                    {
+                        _screenScreenshots[screenNumber] = new Bitmap(tempBmp);
+                    }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"加载截图失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"加载屏幕 {screenNumber} 截图失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -232,23 +302,42 @@ namespace LabelTool
                 var config = Newtonsoft.Json.JsonConvert.DeserializeObject<CaptureSettings>(json);
                 if (config != null)
                 {
-                    _verificationAreas = config.VerificationAreas ?? new List<ImageVerificationArea>();
-                    _collectionAreas = config.CollectionAreas ?? new List<ImageCollectionArea>();
-                    _screenNumber = config.ScreenNumber;
-                    _ocrEngineComboBox.Text = config.OcrEngine ?? "PaddleOCR";
-
-                    // 检查屏幕编号是否越界
-                    var screens = Screen.AllScreens;
-                    if (_screenNumber >= screens.Length)
+                    // 按屏幕分组加载验证区域
+                    _screenVerificationAreas.Clear();
+                    if (config.VerificationAreas != null)
                     {
-                        _screenNumber = 0;
+                        foreach (var area in config.VerificationAreas)
+                        {
+                            int screenNumber = area.ScreenNumber;
+                            if (!_screenVerificationAreas.ContainsKey(screenNumber))
+                            {
+                                _screenVerificationAreas[screenNumber] = new List<ImageVerificationArea>();
+                            }
+                            _screenVerificationAreas[screenNumber].Add(area);
+                        }
                     }
 
-                    // 加载截图
-                    var screenshotPath = GetScreenshotPath();
-                    if (File.Exists(screenshotPath))
+                    // 按屏幕分组加载采集区域
+                    _screenCollectionAreas.Clear();
+                    if (config.CollectionAreas != null)
                     {
-                        LoadScreenshot(screenshotPath);
+                        foreach (var area in config.CollectionAreas)
+                        {
+                            int screenNumber = area.ScreenNumber;
+                            if (!_screenCollectionAreas.ContainsKey(screenNumber))
+                            {
+                                _screenCollectionAreas[screenNumber] = new List<ImageCollectionArea>();
+                            }
+                            _screenCollectionAreas[screenNumber].Add(area);
+                        }
+                    }
+
+                    _ocrEngineComboBox.Text = config.OcrEngine ?? "PaddleOCR";
+
+                    // 加载所有有区域的屏幕的截图
+                    foreach (var screenNumber in _screenVerificationAreas.Keys.Concat(_screenCollectionAreas.Keys).Distinct())
+                    {
+                        LoadScreenshot(screenNumber);
                     }
 
                     // 更新阈值下拉框
@@ -259,6 +348,82 @@ namespace LabelTool
                             _thresholdComboBox.SelectedIndex = i;
                             break;
                         }
+                    }
+
+                    // 构建所有出现过的屏幕编号（截图 + 区域配置的并集）
+                    var allScreenNumbers = _screenScreenshots.Keys
+                        .Concat(_screenVerificationAreas.Keys)
+                        .Concat(_screenCollectionAreas.Keys)
+                        .Distinct()
+                        .OrderBy(n => n)
+                        .ToList();
+
+                    // 遍历每个屏幕，验证截图有效性，分辨率不匹配时给出警告
+                    var warnings = new List<string>();
+                    var validScreenNumbers = new List<int>();
+                    var currentScreens = Screen.AllScreens;
+
+                    foreach (var screenNumber in allScreenNumbers)
+                    {
+                        // 1. 检查截图是否存在（通过 _screenScreenshots 字典判断，文件不存在时字典不包含该键）
+                        if (!_screenScreenshots.ContainsKey(screenNumber))
+                        {
+                            warnings.Add($"屏幕 {screenNumber}：截图文件不存在");
+                            continue;
+                        }
+
+                        // 2. 检查屏幕编号是否越界
+                        if (screenNumber < 0 || screenNumber >= currentScreens.Length)
+                        {
+                            warnings.Add($"屏幕 {screenNumber}：系统屏幕数量不足（当前 {currentScreens.Length} 个）");
+                            continue;
+                        }
+
+                        // 3. 检查分辨率是否匹配（直接使用内存中的 Bitmap，避免重复 I/O）
+                        try
+                        {
+                            var screenshot = _screenScreenshots[screenNumber];
+                            var currentScreenBounds = currentScreens[screenNumber].Bounds;
+                            if (screenshot.Width != currentScreenBounds.Width
+                                || screenshot.Height != currentScreenBounds.Height)
+                            {
+                                warnings.Add($"屏幕 {screenNumber}：分辨率不匹配"
+                                    + $"（配置: {screenshot.Width}×{screenshot.Height}，当前: {currentScreenBounds.Width}×{currentScreenBounds.Height}）");
+                            }
+                            validScreenNumbers.Add(screenNumber);
+                        }
+                        catch (ArgumentException ex)
+                        {
+                            warnings.Add($"屏幕 {screenNumber}：截图文件损坏，无法加载（{ex.Message}）");
+                            continue;
+                        }
+                    }
+
+                    // 设置下拉框依赖的数据源
+                    _capturedScreenNumbers = validScreenNumbers;
+
+                    // 汇总警告
+                    if (warnings.Count > 0)
+                    {
+                        MessageBox.Show(
+                            "加载配置时发现以下问题：\n\n" + string.Join("\n", warnings),
+                            "配置兼容性警告", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+
+                    // 刷新屏幕下拉框
+                    RefreshScreenComboBox();
+
+                    // 切换到第一个有数据的屏幕
+                    if (_capturedScreenNumbers.Count > 0)
+                    {
+                        _currentScreenNumber = _capturedScreenNumbers[0];
+                        SwitchScreen(_currentScreenNumber);
+                    }
+                    else if (_screenScreenshots.Count > 0)
+                    {
+                        // 兜底：没有任何有效屏幕时，尝试切换到最小编号的截图（即使校验失败）
+                        _currentScreenNumber = _screenScreenshots.Keys.Min();
+                        SwitchScreen(_currentScreenNumber);
                     }
 
                     RefreshVerificationList();
@@ -310,16 +475,21 @@ namespace LabelTool
                 // 确保 data 目录存在
                 Directory.CreateDirectory(GetDataDir());
 
-                var screenshotPath = GetScreenshotPath();
+                // 保存所有屏幕的截图
+                foreach (var kvp in _screenScreenshots)
+                {
+                    var screenshotPath = GetScreenshotPath(kvp.Key);
+                    kvp.Value?.Save(screenshotPath, System.Drawing.Imaging.ImageFormat.Png);
+                }
 
-                // 保存截图
-                _screenshot?.Save(screenshotPath, System.Drawing.Imaging.ImageFormat.Png);
+                // 收集所有区域
+                var allVerificationAreas = _screenVerificationAreas.Values.SelectMany(list => list).ToList();
+                var allCollectionAreas = _screenCollectionAreas.Values.SelectMany(list => list).ToList();
 
                 var config = new CaptureSettings
                 {
-                    VerificationAreas = _verificationAreas,
-                    CollectionAreas = _collectionAreas,
-                    ScreenNumber = _screenNumber,
+                    VerificationAreas = allVerificationAreas,
+                    CollectionAreas = allCollectionAreas,
                     OcrEngine = _ocrEngineComboBox.Text
                 };
 
@@ -382,10 +552,7 @@ namespace LabelTool
             if (listView == null || listView.SelectedItems.Count == 0) return;
 
             int index = (int)listView.SelectedItems[0].Tag;
-            if (index >= 0 && index < _verificationAreas.Count)
-            {
-                EditVerificationArea(index);
-            }
+            EditVerificationArea(index);
         }
 
         private void CollectionListView_MouseDoubleClick(object sender, MouseEventArgs e)
@@ -394,29 +561,27 @@ namespace LabelTool
             if (listView == null || listView.SelectedItems.Count == 0) return;
 
             int index = (int)listView.SelectedItems[0].Tag;
-            if (index >= 0 && index < _collectionAreas.Count)
-            {
-                EditCollectionArea(index);
-            }
+            EditCollectionArea(index);
         }
 
         private void DeleteVerificationArea(int index)
         {
-            if (index >= 0 && index < _verificationAreas.Count)
+            var currentAreas = GetCurrentVerificationAreas();
+            if (index >= 0 && index < currentAreas.Count)
             {
-                var area = _verificationAreas[index];
+                var area = currentAreas[index];
                 var result = MessageBox.Show($"确定要删除检测区域 \"{Path.GetFileNameWithoutExtension(area.FileName)}\" 吗？",
                     "确认删除", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
                 if (result == DialogResult.Yes)
                 {
-                    _verificationAreas.RemoveAt(index);
+                    currentAreas.RemoveAt(index);
                     _isModify = true;
                     RefreshVerificationList();
 
                     // 删除后重置选中索引
-                    if (_selectedVerificationIndex >= _verificationAreas.Count)
+                    if (_selectedVerificationIndex >= currentAreas.Count)
                     {
-                        _selectedVerificationIndex = _verificationAreas.Count > 0 ? _verificationAreas.Count - 1 : -1;
+                        _selectedVerificationIndex = currentAreas.Count > 0 ? currentAreas.Count - 1 : -1;
                     }
 
                     _imagePanel.Invalidate();
@@ -427,21 +592,22 @@ namespace LabelTool
 
         private void DeleteCollectionArea(int index)
         {
-            if (index >= 0 && index < _collectionAreas.Count)
+            var currentAreas = GetCurrentCollectionAreas();
+            if (index >= 0 && index < currentAreas.Count)
             {
-                var area = _collectionAreas[index];
+                var area = currentAreas[index];
                 var result = MessageBox.Show($"确定要删除采集区域 \"{area.Name}\" 吗？",
                     "确认删除", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
                 if (result == DialogResult.Yes)
                 {
-                    _collectionAreas.RemoveAt(index);
+                    currentAreas.RemoveAt(index);
                     _isModify = true;
                     RefreshCollectionList();
 
                     // 删除后重置选中索引
-                    if (_selectedCollectionIndex >= _collectionAreas.Count)
+                    if (_selectedCollectionIndex >= currentAreas.Count)
                     {
-                        _selectedCollectionIndex = _collectionAreas.Count > 0 ? _collectionAreas.Count - 1 : -1;
+                        _selectedCollectionIndex = currentAreas.Count > 0 ? currentAreas.Count - 1 : -1;
                     }
 
                     _imagePanel.Invalidate();
@@ -505,7 +671,8 @@ namespace LabelTool
                 // 切换选中区域
                 if (_isVerificationAreaMode)
                 {
-                    if (_selectedVerificationIndex < 0 && _verificationAreas.Count > 0)
+                    var currentVerificationAreas = GetCurrentVerificationAreas();
+                    if (_selectedVerificationIndex < 0 && currentVerificationAreas.Count > 0)
                     {
                         _selectedVerificationIndex = 0;
                     }
@@ -513,7 +680,8 @@ namespace LabelTool
                 }
                 else
                 {
-                    if (_selectedCollectionIndex < 0 && _collectionAreas.Count > 0)
+                    var currentCollectionAreas = GetCurrentCollectionAreas();
+                    if (_selectedCollectionIndex < 0 && currentCollectionAreas.Count > 0)
                     {
                         _selectedCollectionIndex = 0;
                     }

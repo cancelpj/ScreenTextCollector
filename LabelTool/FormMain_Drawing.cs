@@ -12,7 +12,8 @@ namespace LabelTool
 
         private void ImagePanel_Paint(object sender, PaintEventArgs e)
         {
-            if (_screenshot == null)
+            var screenshot = GetCurrentScreenshot();
+            if (screenshot == null)
             {
                 e.Graphics.Clear(Color.Black);
                 using (var font = new Font("Microsoft Sans Serif", 14))
@@ -37,15 +38,15 @@ namespace LabelTool
             if (_isAutoZoom)
             {
                 // 自动缩放模式：图片适应滚动容器
-                scaleX = (float)_scrollContainer.ClientSize.Width / _screenshot.Width;
-                scaleY = (float)_scrollContainer.ClientSize.Height / _screenshot.Height;
+                scaleX = (float)_scrollContainer.ClientSize.Width / screenshot.Width;
+                scaleY = (float)_scrollContainer.ClientSize.Height / screenshot.Height;
                 // 保持宽高比，取较小值
                 float minScale = Math.Min(scaleX, scaleY);
-                int drawW = (int)(_screenshot.Width * minScale);
-                int drawH = (int)(_screenshot.Height * minScale);
+                int drawW = (int)(screenshot.Width * minScale);
+                int drawH = (int)(screenshot.Height * minScale);
                 int ox = (_scrollContainer.ClientSize.Width - drawW) / 2;
                 int oy = (_scrollContainer.ClientSize.Height - drawH) / 2;
-                e.Graphics.DrawImage(_screenshot, ox, oy, drawW, drawH);
+                e.Graphics.DrawImage(screenshot, ox, oy, drawW, drawH);
                 scaleX = minScale;
                 scaleY = minScale;
                 areaOffsetX = ox;
@@ -56,15 +57,19 @@ namespace LabelTool
                 // 手动缩放模式：绘制缩放后的图片，滚动容器负责滚动
                 scaleX = _zoomLevel;
                 scaleY = _zoomLevel;
-                int drawWidth = (int)(_screenshot.Width * _zoomLevel);
-                int drawHeight = (int)(_screenshot.Height * _zoomLevel);
-                e.Graphics.DrawImage(_screenshot, 0, 0, drawWidth, drawHeight);
+                int drawWidth = (int)(screenshot.Width * _zoomLevel);
+                int drawHeight = (int)(screenshot.Height * _zoomLevel);
+                e.Graphics.DrawImage(screenshot, 0, 0, drawWidth, drawHeight);
             }
 
-            // 绘制检测区域（蓝色）
-            for (int i = 0; i < _verificationAreas.Count; i++)
+            // 获取当前屏幕的区域列表
+            var currentVerificationAreas = GetCurrentVerificationAreas();
+            var currentCollectionAreas = GetCurrentCollectionAreas();
+
+            // 绘制检测区域（蓝色）- 只绘制当前屏幕的区域
+            for (int i = 0; i < currentVerificationAreas.Count; i++)
             {
-                var area = _verificationAreas[i];
+                var area = currentVerificationAreas[i];
                 int x = (int)(area.TopLeftX * scaleX) + areaOffsetX;
                 int y = (int)(area.TopLeftY * scaleY) + areaOffsetY;
                 var rect = new Rectangle(
@@ -78,10 +83,10 @@ namespace LabelTool
                 DrawArea(e.Graphics, rect, frontColor, backColor, "检测: " + Path.GetFileNameWithoutExtension(area.FileName), i == _selectedVerificationIndex);
             }
 
-            // 绘制采集区域（橙色）
-            for (int i = 0; i < _collectionAreas.Count; i++)
+            // 绘制采集区域（橙色）- 只绘制当前屏幕的区域
+            for (int i = 0; i < currentCollectionAreas.Count; i++)
             {
-                var area = _collectionAreas[i];
+                var area = currentCollectionAreas[i];
                 int x = (int)(area.TopLeftX * scaleX) + areaOffsetX;
                 int y = (int)(area.TopLeftY * scaleY) + areaOffsetY;
                 var rect = new Rectangle(
@@ -176,12 +181,16 @@ namespace LabelTool
         /// </summary>
         private void UpdateCursorForResizeHandles(Point mousePos)
         {
-            if (_screenshot == null) return;
+            var screenshot = GetCurrentScreenshot();
+            if (screenshot == null) return;
+
+            var currentVerificationAreas = GetCurrentVerificationAreas();
+            var currentCollectionAreas = GetCurrentCollectionAreas();
 
             // 检查检测区域
-            if (_selectedVerificationIndex >= 0)
+            if (_selectedVerificationIndex >= 0 && _selectedVerificationIndex < currentVerificationAreas.Count)
             {
-                var area = _verificationAreas[_selectedVerificationIndex];
+                var area = currentVerificationAreas[_selectedVerificationIndex];
                 var panelRect = ImageToPanelRect(new VerificationAreaAdapter(area));
                 int handle = GetResizeHandle(panelRect, mousePos);
                 SetCursorForHandle(handle);
@@ -189,9 +198,9 @@ namespace LabelTool
             }
 
             // 检查采集区域
-            if (_selectedCollectionIndex >= 0)
+            if (_selectedCollectionIndex >= 0 && _selectedCollectionIndex < currentCollectionAreas.Count)
             {
-                var area = _collectionAreas[_selectedCollectionIndex];
+                var area = currentCollectionAreas[_selectedCollectionIndex];
                 var panelRect = ImageToPanelRect(new CollectionAreaAdapter(area));
                 int handle = GetResizeHandle(panelRect, mousePos);
                 SetCursorForHandle(handle);

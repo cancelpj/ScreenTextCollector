@@ -9,11 +9,6 @@ namespace PluginInterface
     public class CaptureSettings
     {
         /// <summary>
-        /// 屏幕编号，从 0 开始
-        /// </summary>
-        public int ScreenNumber { get; set; } = 0;
-
-        /// <summary>
         /// 图像验证区域列表
         /// </summary>
         public List<ImageVerificationArea> VerificationAreas { get; set; }
@@ -34,6 +29,11 @@ namespace PluginInterface
     /// </summary>
     public class ImageVerificationArea
     {
+        /// <summary>
+        /// 所属屏幕编号，从 0 开始
+        /// </summary>
+        public int ScreenNumber { get; set; }
+
         public int TopLeftX { get; set; }
         public int TopLeftY { get; set; }
         public int Width { get; set; }
@@ -55,6 +55,11 @@ namespace PluginInterface
     /// </summary>
     public class ImageCollectionArea
     {
+        /// <summary>
+        /// 所属屏幕编号，从 0 开始
+        /// </summary>
+        public int ScreenNumber { get; set; }
+
         /// <summary>
         /// 采集项名称
         /// </summary>

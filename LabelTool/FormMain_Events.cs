@@ -62,30 +62,25 @@ namespace LabelTool
             // 加载可用的 MQTT Topic 列表
             LoadAvailableTopics();
 
-            // 检查截图文件是否存在
-            var screenshotPath = GetScreenshotPath();
-            if (!File.Exists(screenshotPath))
+            // 检查是否存在旧配置或截图
+            var configPath = GetConfigPath();
+            if (File.Exists(configPath))
             {
-                // 没有截图文件，直接清空旧配置并截屏
-                DeleteOldConfig();
-                SelectScreenAndCapture(sender, e);
+                // 加载旧配置文件
+                LoadConfig();
             }
             else
             {
-                // 加载截图
-                LoadScreenshot(screenshotPath);
-
-                // 有旧配置文件则加载
-                var configPath = GetConfigPath();
-                if (File.Exists(configPath))
-                {
-                    LoadConfig();
-                }
+                // 没有配置，弹出截屏对话框
+                SelectScreenAndCapture(sender, e);
             }
 
             // 设置默认选中检测区域
             _radioVerificationArea.Checked = true;
             _isVerificationAreaMode = true;
+
+            // 刷新屏幕下拉框
+            RefreshScreenComboBox();
 
             // 更新状态栏
             _statusLabel.Text = "就绪";
@@ -160,12 +155,7 @@ namespace LabelTool
                 if (hit.ColumnIndex == 4)
                 {
                     int index = hit.RowIndex;
-                    if (index >= 0 && index < _collectionAreas.Count)
-                    {
-                        _collectionAreas.RemoveAt(index);
-                        RefreshCollectionList();
-                        _isModify = true;
-                    }
+                    DeleteCollectionArea(index);
                 }
                 // 点击行时选中
                 else if (hit.ColumnIndex >= 0 && hit.ColumnIndex <= 3)

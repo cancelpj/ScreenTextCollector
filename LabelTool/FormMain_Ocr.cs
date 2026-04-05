@@ -20,13 +20,16 @@ namespace LabelTool
         }
 
         /// <summary>
-        /// 刷新采集列表中所有区域的 OCR 识别结果
+        /// 刷新采集列表中所有区域的 OCR 识别结果（只对当前屏幕的区域执行）
         /// </summary>
         private bool RefreshCollectionListOcrResults()
         {
-            if (_screenshot == null || _collectionAreas.Count == 0)
+            var screenshot = GetCurrentScreenshot();
+            var currentAreas = GetCurrentCollectionAreas();
+
+            if (screenshot == null || currentAreas.Count == 0)
             {
-                _statusLabel.Text = "没有截图或采集区域，无法执行 OCR 识别";
+                _statusLabel.Text = "当前屏幕没有截图或采集区域，无法执行 OCR 识别";
                 return false;
             }
 
@@ -34,15 +37,15 @@ namespace LabelTool
             {
                 // 保存临时截图用于 OCR
                 var tempPath = Path.Combine(Path.GetTempPath(), "labeltool_ocr_temp.png");
-                _screenshot.Save(tempPath, System.Drawing.Imaging.ImageFormat.Png);
+                screenshot.Save(tempPath, System.Drawing.Imaging.ImageFormat.Png);
 
                 // 根据选中的引擎创建对应的 OcrService
                 IOcrService ocrService = CreateOcrService(_ocrEngineComboBox.SelectedIndex);
 
                 // 对每个采集区域执行 OCR
-                for (int i = 0; i < _collectionAreas.Count; i++)
+                for (int i = 0; i < currentAreas.Count; i++)
                 {
-                    var area = _collectionAreas[i];
+                    var area = currentAreas[i];
                     string result = ocrService.PerformOcr(tempPath, area);
 
                     // 更新 DataGridView OCR结果列（第3列，索引2）

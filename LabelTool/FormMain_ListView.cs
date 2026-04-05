@@ -11,9 +11,10 @@ namespace LabelTool
         private void RefreshVerificationList()
         {
             _verificationListView.Items.Clear();
-            for (int i = 0; i < _verificationAreas.Count; i++)
+            var currentAreas = GetCurrentVerificationAreas();
+            for (int i = 0; i < currentAreas.Count; i++)
             {
-                var area = _verificationAreas[i];
+                var area = currentAreas[i];
                 var item = new ListViewItem(Path.GetFileNameWithoutExtension(area.FileName));
                 item.SubItems.Add($"({area.TopLeftX}, {area.TopLeftY}, {area.Width}x{area.Height})");
                 item.SubItems.Add("×");
@@ -25,9 +26,10 @@ namespace LabelTool
         private void RefreshCollectionList()
         {
             _collectionDataGridView.Rows.Clear();
-            for (int i = 0; i < _collectionAreas.Count; i++)
+            var currentAreas = GetCurrentCollectionAreas();
+            for (int i = 0; i < currentAreas.Count; i++)
             {
-                var area = _collectionAreas[i];
+                var area = currentAreas[i];
                 int rowIndex = _collectionDataGridView.Rows.Add();
                 var row = _collectionDataGridView.Rows[rowIndex];
                 row.Cells[0].Value = area.Name;

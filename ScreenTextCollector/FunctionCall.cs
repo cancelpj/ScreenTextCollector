@@ -8,34 +8,36 @@ namespace ScreenTextCollector
         #region 业务功能
 
         /// <summary>
-        /// 执行屏幕文本采集
+        /// 执行屏幕文本采集（多屏幕支持）
         /// </summary>
         /// <param name="areaName">采集区域名称，为空时采集所有区域</param>
         /// <returns>采集结果</returns>
         private static MethodResult ScreenTextCollect(string areaName = null)
         {
-            var ret = Tool.CaptureAndVerify(OcrService.VerifyImage, Tool.CaptureSettings.VerificationAreas);
-            if (ret.ResultType != MethodResultType.Success)
-            {
-                Tool.OutputMessage(ret);
-                return ret;
-            }
-
             if (string.IsNullOrEmpty(areaName))
             {
-                ret = Tool.ProcessScreenCapture(ret.Message, OcrService.PerformOcr);
+                // 多屏幕批量采集（包含图像校验）
+                var ret = Tool.ProcessMultiScreenCapture(OcrService.PerformOcr, OcrService.VerifyImage);
+                if (ret.ResultType != MethodResultType.Success)
+                {
+                    Tool.OutputMessage(ret);
+                    return ret;
+                }
+
+                // 返回所有采集结果
+                return new MethodResult(
+                    Newtonsoft.Json.JsonConvert.SerializeObject(ret.Data.Data),
+                    MethodResultType.Success);
             }
             else
             {
-                ret = Tool.ProcessScreenCaptureSingle(ret.Message, areaName, OcrService.PerformOcr);
+                var ret = Tool.ProcessScreenCaptureSingle(OcrService.PerformOcr, OcrService.VerifyImage, areaName);
+                if (ret.ResultType != MethodResultType.Success)
+                {
+                    Tool.OutputMessage(ret);
+                }
+                return ret;
             }
-
-            if (ret.ResultType != MethodResultType.Success)
-            {
-                Tool.OutputMessage(ret);
-            }
-
-            return ret;
         }
 
         /// <summary>

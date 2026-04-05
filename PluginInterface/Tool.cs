@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -143,10 +144,11 @@ namespace PluginInterface
         #endregion
 
         /// <summary>
-        /// 截屏
+        /// 截取指定屏幕
         /// </summary>
-        /// <returns>截图保存路径</returns>
-        public static MethodResult GetScreenCapture()
+        /// <param name="screenNumber">屏幕编号，从 0 开始</param>
+        /// <returns>截图保存路径（通过 Data 属性返回）</returns>
+        private static MethodResult<string> CaptureScreen(int screenNumber = 0)
         {
             try
             {
@@ -156,14 +158,16 @@ namespace PluginInterface
                     Directory.CreateDirectory(tempDir);
                 }
 
-                var path = Path.Combine(tempDir, $"{DateTime.Now:yyyyMMddHHmmssfff}.png");
+                // 文件名包含屏幕编号，便于调试
+                var path = Path.Combine(tempDir, $"{DateTime.Now:yyyyMMddHHmmssfff}_S{screenNumber}.png");
 
-                if (Screen.AllScreens.Length - 1 < CaptureSettings.ScreenNumber)
+                // 屏幕越界检查
+                if (screenNumber < 0 || screenNumber >= Screen.AllScreens.Length)
                 {
-                    return new MethodResult("屏幕编号超出范围");
+                    return new MethodResult<string>($"屏幕编号 {screenNumber} 超出范围（0-{Screen.AllScreens.Length - 1}）", MethodResultType.Error);
                 }
 
-                Screen screen = Screen.AllScreens[CaptureSettings.ScreenNumber];
+                Screen screen = Screen.AllScreens[screenNumber];
                 Rectangle bounds = screen.Bounds;
                 using (var screenShot = new Bitmap(bounds.Width, bounds.Height))
                 {
@@ -177,11 +181,11 @@ namespace PluginInterface
                     }
                 }
 
-                return new MethodResult(path, MethodResultType.Success);
+                return new MethodResult<string>(path, "截屏成功", MethodResultType.Success);
             }
             catch (Exception ex)
             {
-                return new MethodResult("截屏失败", ex);
+                return new MethodResult<string>("截屏失败", ex);
             }
         }
 
@@ -189,40 +193,32 @@ namespace PluginInterface
         /// 执行截屏并进行图像校验，成功时返回截图路径
         /// </summary>
         /// <param name="verifyImage">图像校验委托</param>
-        /// <param name="verificationAreas">验证区域列表</param>
-        /// <returns>校验成功的截图路径，失败时返回对应 MethodResult</returns>
-        public static MethodResult CaptureAndVerify(
+        /// <param name="verificationAreas">验证区域列表（将按 ScreenNumber 筛选）</param>
+        /// <param name="screenNumber">屏幕编号</param>
+        /// <returns>校验成功的截图路径（通过 Data 属性返回）</returns>
+        private static MethodResult<string> CaptureAndVerify(
             Func<string, List<ImageVerificationArea>, bool> verifyImage,
-            List<ImageVerificationArea> verificationAreas)
+            List<ImageVerificationArea> verificationAreas,
+            int screenNumber)
         {
-            var ret = GetScreenCapture();
+            // 筛选属于该屏幕的验证区域
+            var screenVerificationAreas = verificationAreas?.FindAll(a => a.ScreenNumber == screenNumber);
+            if (screenVerificationAreas == null || screenVerificationAreas.Count == 0)
+            {
+                return new MethodResult<string>($"未找到图像校验区域配置", MethodResultType.Error);
+            }
+
+            var ret = CaptureScreen(screenNumber);
             if (ret.ResultType != MethodResultType.Success)
                 return ret;
 
-            if (!verifyImage(ret.Message, verificationAreas))
+            if (!verifyImage(ret.Data, screenVerificationAreas))
             {
-                File.Delete(ret.Message);
-                return new MethodResult("未监测到程序画面", MethodResultType.Warning);
+                File.Delete(ret.Data);
+                return new MethodResult<string>("未监测到程序画面", MethodResultType.Warning);
             }
 
             return ret;
-        }
-
-        /// <summary>
-        /// 处理屏幕截图，执行图像校验和OCR文字采集
-        /// </summary>
-        /// <param name="screenShotPath">已验证的屏幕截图文件路径</param>
-        /// <param name="performOcr">OCR识别委托，用于从图像采集区域提取文字</param>
-        /// <returns>处理结果。成功时返回JSON格式的采集数据；异常时返回错误信息</returns>
-        public static MethodResult ProcessScreenCapture(string screenShotPath,
-            Func<string, ImageCollectionArea, string> performOcr)
-        {
-            var ret = ProcessScreenCaptureWithTopic(screenShotPath, performOcr);
-            if (ret.ResultType == MethodResultType.Success)
-            {
-                return new MethodResult(JsonConvert.SerializeObject(ret.Data.Data), MethodResultType.Success);
-            }
-            return new MethodResult(ret.Message, ret.ResultType);
         }
 
         /// <summary>
@@ -230,16 +226,24 @@ namespace PluginInterface
         /// </summary>
         /// <param name="screenShotPath">已验证的屏幕截图文件路径</param>
         /// <param name="performOcr">OCR识别委托</param>
+        /// <param name="screenNumber">屏幕编号（用于筛选对应屏幕的区域）</param>
         /// <returns>采集结果，包含数据字典和 Topic 映射</returns>
-        public static MethodResult<CollectionResult> ProcessScreenCaptureWithTopic(string screenShotPath,
-            Func<string, ImageCollectionArea, string> performOcr)
+        private static MethodResult<CollectionResult> ProcessScreenCaptureWithTopic(string screenShotPath,
+            Func<string, ImageCollectionArea, string> performOcr, List<ImageCollectionArea> collectionAreas, int screenNumber = 0)
         {
             try
             {
+                // 筛选属于该屏幕的采集区域
+                var screenCollectionAreas = collectionAreas?.FindAll(a => a.ScreenNumber == screenNumber);
+                if (screenCollectionAreas == null || screenCollectionAreas.Count == 0)
+                {
+                    return new MethodResult<CollectionResult>($"未找到图像采集区域配置", MethodResultType.Error);
+                }
+
                 // 图像采集
                 var data = new ConcurrentDictionary<string, string>();
                 var topicMap = new ConcurrentDictionary<string, string>();
-                Parallel.ForEach(CaptureSettings.CollectionAreas, area =>
+                Parallel.ForEach(screenCollectionAreas, area =>
                 {
                     data[area.Name] = performOcr(screenShotPath, area);
                     if (!string.IsNullOrEmpty(area.Topic))
@@ -272,14 +276,85 @@ namespace PluginInterface
         }
 
         /// <summary>
+        /// 处理多屏幕截图，批量截取所有屏幕并处理 OCR
+        /// </summary>
+        /// <param name="performOcr">OCR识别委托</param>
+        /// <param name="verifyImage">图像校验委托（必须提供）</param>
+        /// <returns>所有屏幕的采集结果汇总</returns>
+        public static MethodResult<CollectionResult> ProcessMultiScreenCapture(
+            Func<string, ImageCollectionArea, string> performOcr,
+            Func<string, List<ImageVerificationArea>, bool> verifyImage)
+        {
+            if (verifyImage == null)
+                throw new ArgumentNullException(nameof(verifyImage));
+
+            try
+            {
+                var allData = new ConcurrentDictionary<string, string>();
+                var allTopicMap = new ConcurrentDictionary<string, string>();
+
+                // 获取所有验证区域和采集区域
+                var verificationAreas = CaptureSettings.VerificationAreas ?? new List<ImageVerificationArea>();
+                var collectionAreas = CaptureSettings.CollectionAreas ?? new List<ImageCollectionArea>();
+
+                // 获取所有需要处理的屏幕编号（验证区域和采集区域都可能分布在不同屏幕）
+                var allScreenNumbers = verificationAreas.Select(a => a.ScreenNumber)
+                    .Concat(collectionAreas.Select(a => a.ScreenNumber))
+                    .Distinct();
+
+                foreach (var screenNumber in allScreenNumbers)
+                {
+                    // 调用 CaptureAndVerify 进行截屏和图像校验
+                    var captureResult = CaptureAndVerify(verifyImage, verificationAreas, screenNumber);
+                    if (captureResult.ResultType != MethodResultType.Success)
+                    {
+                        Log.Warn($"屏幕 {screenNumber}: {captureResult.Message}");
+                        continue;
+                    }
+                    string screenshotPath = captureResult.Data;
+
+                    // 调用 ProcessScreenCaptureWithTopic 执行 OCR（会在 finally 中删除截图）
+                    var ocrResult = ProcessScreenCaptureWithTopic(screenshotPath, performOcr, collectionAreas, screenNumber);
+                    if (ocrResult.ResultType == MethodResultType.Success)
+                    {
+                        // 合并结果
+                        foreach (var kvp in ocrResult.Data.Data)
+                        {
+                            allData[kvp.Key] = kvp.Value;
+                        }
+                        foreach (var kvp in ocrResult.Data.TopicMap)
+                        {
+                            allTopicMap[kvp.Key] = kvp.Value;
+                        }
+                    }
+                }
+
+                // 汇总结果
+                var multiScreenResult = new CollectionResult
+                {
+                    Data = new Dictionary<string, string>(allData),
+                    TopicMap = new Dictionary<string, string>(allTopicMap)
+                };
+
+                Log.Info("多屏幕识别结果：{0}", JsonConvert.SerializeObject(multiScreenResult.Data));
+                return new MethodResult<CollectionResult>(multiScreenResult, MethodResultType.Success.ToString(), MethodResultType.Success);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "处理多屏幕截屏失败");
+                return new MethodResult<CollectionResult>("处理多屏幕截屏失败", ex);
+            }
+        }
+
+        /// <summary>
         /// 处理单个采集区域的 OCR
         /// </summary>
         /// <param name="screenShotPath">屏幕截图路径</param>
         /// <param name="areaName">采集区域名称</param>
         /// <param name="performOcr">OCR 识别委托</param>
         /// <returns>MethodResult，单区域采集结果</returns>
-        public static MethodResult ProcessScreenCaptureSingle(string screenShotPath, string areaName,
-            Func<string, ImageCollectionArea, string> performOcr)
+        public static MethodResult ProcessScreenCaptureSingle(Func<string, ImageCollectionArea, string> performOcr,
+            Func<string, List<ImageVerificationArea>, bool> verifyImage, string areaName)
         {
             var area = CaptureSettings.CollectionAreas?.Find(a => a.Name == areaName);
             if (area == null)
@@ -287,9 +362,17 @@ namespace PluginInterface
                 return new MethodResult($"未找到采集区域: {areaName}", MethodResultType.Error);
             }
 
+            var captureResult = CaptureAndVerify(verifyImage, CaptureSettings.VerificationAreas, area.ScreenNumber);
+            if (captureResult.ResultType != MethodResultType.Success)
+            {
+                Tool.OutputMessage(captureResult);
+                return captureResult;
+            }
+
+            string screenshotPath = captureResult.Data;
             try
             {
-                string result = performOcr(screenShotPath, area);
+                string result = performOcr(screenshotPath, area);
                 Log.Info("单个区域识别结果 [{0}]: {1}", areaName, result);
 
                 var singleResult = new Dictionary<string, string> { { areaName, result } };
@@ -309,13 +392,13 @@ namespace PluginInterface
             finally
             {
                 // 确保截图文件被清理
-                try { File.Delete(screenShotPath); } catch { }
+                try { File.Delete(screenshotPath); } catch { }
             }
         }
 
         /// <summary>
         /// 保存结果到 CSV 文件
-        /// 每个采集项保存在一行（名称, 值）
+        /// 每行格式：时间戳, 采集项名称, 值
         /// </summary>
         /// <param name="results">采集结果</param>
         public static void SaveToCsv(IDictionary<string, string> results)
@@ -326,18 +409,15 @@ namespace PluginInterface
                 Directory.CreateDirectory(saveDir);
             }
 
-            var date = DateTime.Now.ToString("yyyyMMdd");
-            var csvPath = Path.Combine(saveDir, $"{date}.csv");
-            var isNewFile = !File.Exists(csvPath);
+            var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            var csvPath = Path.Combine(saveDir, $"{DateTime.Now:yyyyMMdd}.csv");
 
             using (var writer = new StreamWriter(csvPath, true, Encoding.UTF8))
             {
-                if (isNewFile)
+                foreach (var item in results)
                 {
-                    writer.WriteLine(string.Join(",", results.Keys));
+                    writer.WriteLine($"{timestamp},{item.Key},{item.Value}");
                 }
-
-                writer.WriteLine(string.Join(",", results.Values));
             }
         }
 

@@ -10,12 +10,16 @@ namespace LabelTool
 {
     public partial class FormMain : Form
     {
-        private const string Title = "截屏采集标注工具 V1.4.1";
+        private const string Title = "截屏采集标注工具 V1.5";
 
-        // 截屏图片
-        private Bitmap _screenshot;
+        // 截屏图片（按屏幕分组存储）
+        private Dictionary<int, Bitmap> _screenScreenshots = new Dictionary<int, Bitmap>();
 
-        // 鼠标拖拽状态
+        // 当前选中的屏幕编号
+        private int _currentScreenNumber = 0;
+
+        // 已勾选并截屏的屏幕编号列表（来自 FormScreenSelect）
+        private List<int> _capturedScreenNumbers = new List<int>();
         private Point _dragStart;
         private Point _dragEnd;
         private bool _isDragging;
@@ -24,9 +28,9 @@ namespace LabelTool
         private bool _isResizingArea; // 是否在缩放已选中的区域
         private int _resizeHandle = -1; // 缩放手柄编号（0-7）
 
-        // 区域列表
-        private List<ImageVerificationArea> _verificationAreas = new List<ImageVerificationArea>();
-        private List<ImageCollectionArea> _collectionAreas = new List<ImageCollectionArea>();
+        // 区域列表（按屏幕分组存储）
+        private Dictionary<int, List<ImageVerificationArea>> _screenVerificationAreas = new Dictionary<int, List<ImageVerificationArea>>();
+        private Dictionary<int, List<ImageCollectionArea>> _screenCollectionAreas = new Dictionary<int, List<ImageCollectionArea>>();
 
         // 当前选中的区域
         private int _selectedVerificationIndex = -1;
@@ -36,10 +40,7 @@ namespace LabelTool
         private bool _isVerificationAreaMode = true; // true=检测区域, false=采集区域
 
         // 匹配阈值
-        private float _matchThreshold = 0.8f;
-
-        // 当前屏幕编号
-        private int _screenNumber;
+        private float _matchThreshold = 1;
 
         // 可用的 MQTT Topic 列表
         private List<string> _availableTopics = new List<string>();
@@ -74,7 +75,6 @@ namespace LabelTool
         private DataGridView _collectionDataGridView;
         private StatusStrip _statusStrip;
         private ToolStripStatusLabel _statusLabel;
-        private ToolStripSeparator _toolStripSeparator1;
         private ToolStripLabel _toolStripLabel1;
         private ToolStripComboBox _thresholdComboBox;
         private RadioButton _radioVerificationArea;
@@ -82,6 +82,7 @@ namespace LabelTool
         private Label _lblTabHint;
         private ToolTip _toolTip;
         private ToolStripButton _btnCapture;
+        private ToolStripComboBox _screenComboBox;
         private ToolStripButton _btnSave;
         private ToolStripButton _btnOpenConfig;
         private ToolStripButton _btnAbout;
@@ -155,6 +156,7 @@ namespace LabelTool
             // 先创建所有控件对象（在 SuspendLayout 之前）
             _toolStrip = new ToolStrip();
             _btnCapture = new ToolStripButton();
+            _screenComboBox = new ToolStripComboBox();
             _btnSave = new ToolStripButton();
             _btnOpenConfig = new ToolStripButton();
             _btnSettings = new ToolStripButton();
@@ -175,7 +177,6 @@ namespace LabelTool
             _collectionGroup = new GroupBox();
             _statusStrip = new StatusStrip();
             _statusLabel = new ToolStripStatusLabel();
-            _toolStripSeparator1 = new ToolStripSeparator();
             _toolStripLabel1 = new ToolStripLabel();
             _thresholdComboBox = new ToolStripComboBox();
             _radioVerificationArea = new RadioButton();
@@ -252,9 +253,16 @@ namespace LabelTool
 
             // ToolStrip
             _btnCapture.Name = "_btnCapture";
-            _btnCapture.Text = "重新截屏 Ctrl+R";
+            _btnCapture.Text = "新建采集 Ctrl+R";
             _btnCapture.Image = screenshotIcon;
             _btnCapture.Click += new System.EventHandler(this.BtnCapture_Click);
+
+            // 屏幕选择下拉框
+            _screenComboBox.Name = "_screenComboBox";
+            _screenComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            _screenComboBox.Width = 150;
+            _screenComboBox.SelectedIndexChanged += new System.EventHandler(this.ScreenComboBox_SelectedIndexChanged);
+            _screenComboBox.ComboBox.DropDown += new EventHandler(ScreenComboBox_DropDown);
 
             _btnSave.Name = "_btnSave";
             _btnSave.Text = "保存采集配置 Ctrl+S";
@@ -279,9 +287,11 @@ namespace LabelTool
             _btnAbout.Click += new System.EventHandler(this.BtnAbout_Click);
 
             _toolStrip.Items.Add(_btnCapture);
+            _toolStrip.Items.Add(_screenComboBox);
+            _toolStrip.Items.Add(_toolStripSepA);
             _toolStrip.Items.Add(_btnSave);
             _toolStrip.Items.Add(_btnOpenConfig);
-            _toolStrip.Items.Add(_toolStripSepA);
+            _toolStrip.Items.Add(_toolStripSepB);
             _toolStrip.Items.Add(_btnAbout);
             _toolStrip.Items.Add(_btnSettings);
             _toolStrip.Location = new Point(0, 0);
@@ -291,11 +301,13 @@ namespace LabelTool
 
             // 匹配阈值下拉框
             _toolStripLabel1.Name = "_toolStripLabel1";
-            _toolStripLabel1.Text = "匹配阈值:";
+            _toolStripLabel1.Text = "默认匹配度:";
+            _thresholdComboBox.AutoSize = false;
+            _thresholdComboBox.Width = 40;
             _thresholdComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
-            _thresholdComboBox.Items.AddRange(new object[] { "0.7", "0.8", "0.85", "0.9", "0.95" });
+            _thresholdComboBox.Items.AddRange(new object[] { "1", "0.95", "0.9", "0.85", "0.8" });
             _thresholdComboBox.Name = "_thresholdComboBox";
-            _thresholdComboBox.SelectedIndex = 1; // 默认0.8
+            _thresholdComboBox.SelectedIndex = 0;
             _thresholdComboBox.SelectedIndexChanged += new System.EventHandler(this.ThresholdComboBox_SelectedIndexChanged);
 
             // OCR引擎下拉框
@@ -313,22 +325,24 @@ namespace LabelTool
             _btnOcrTest.Image = ocrIcon;
             _btnOcrTest.Click += new System.EventHandler(this.BtnOcrTest_Click);
 
-            _toolStrip.Items.Add(_toolStripSeparator1);
             _toolStrip.Items.Add(_toolStripLabel1);
             _toolStrip.Items.Add(_thresholdComboBox);
-            _toolStrip.Items.Add(_toolStripSepB);
             _toolStrip.Items.Add(_ocrEngineLabel);
             _toolStrip.Items.Add(_ocrEngineComboBox);
             _toolStrip.Items.Add(_toolStripSepC);
             _toolStrip.Items.Add(_btnOcrTest);
 
             // 缩放控制
+            _cmbZoomMode.AutoSize = false;
+            _cmbZoomMode.Width = 80;
             _cmbZoomMode.DropDownStyle = ComboBoxStyle.DropDownList;
             _cmbZoomMode.Items.AddRange(new object[] { "自动缩放", "手动缩放" });
             _cmbZoomMode.Name = "_cmbZoomMode";
             _cmbZoomMode.SelectedIndex = 0; // 默认自动缩放
             _cmbZoomMode.SelectedIndexChanged += new System.EventHandler(this.CmbZoomMode_SelectedIndexChanged);
 
+            _cmbZoomLevel.AutoSize = false;
+            _cmbZoomLevel.Width = 60;
             _cmbZoomLevel.DropDownStyle = ComboBoxStyle.DropDown;
             _cmbZoomLevel.Items.AddRange(new object[] { "50%", "75%", "100%", "125%", "150%" });
             _cmbZoomLevel.Name = "_cmbZoomLevel";
@@ -561,7 +575,7 @@ namespace LabelTool
         {
             if (disposing)
             {
-                _screenshot?.Dispose();
+                ClearAllScreenshots();
             }
             base.Dispose(disposing);
         }
