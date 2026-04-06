@@ -10,7 +10,7 @@ namespace LabelTool
 {
     public partial class FormMain : Form
     {
-        private const string Title = "截屏采集标注工具 V1.5.1";
+        private const string Title = "截屏采集标注工具 V1.5.2";
 
         // 截屏图片（按屏幕分组存储）
         private Dictionary<int, Bitmap> _screenScreenshots = new Dictionary<int, Bitmap>();
@@ -489,6 +489,7 @@ namespace LabelTool
             _collectionDataGridView.CellMouseEnter += new System.Windows.Forms.DataGridViewCellEventHandler(this.CollectionDataGridView_CellMouseEnter);
             _collectionDataGridView.SelectionChanged += new System.EventHandler(this.CollectionDataGridView_SelectionChanged);
             _collectionDataGridView.MouseClick += new System.Windows.Forms.MouseEventHandler(this.CollectionDataGridView_MouseClick);
+            _collectionDataGridView.MouseDoubleClick += new System.Windows.Forms.MouseEventHandler(this.CollectionDataGridView_MouseDoubleClick);
             _collectionGroup.Controls.Add(_collectionDataGridView);
 
             // Radio buttons

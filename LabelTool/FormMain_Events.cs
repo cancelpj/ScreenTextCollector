@@ -170,6 +170,17 @@ namespace LabelTool
             }
         }
 
+        // 双击行时编辑采集区域
+        private void CollectionDataGridView_MouseDoubleClick(object sender, MouseEventArgs e)
+        {
+            var hit = _collectionDataGridView.HitTest(e.X, e.Y);
+            if (hit.Type == DataGridViewHitTestType.Cell && hit.RowIndex >= 0)
+            {
+                int index = (int)_collectionDataGridView.Rows[hit.RowIndex].Tag;
+                EditCollectionArea(index);
+            }
+        }
+
         // 显示 OCR 结果详情弹窗
         private void ShowOcrResultDialog(string text)
         {
