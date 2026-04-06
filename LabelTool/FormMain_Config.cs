@@ -494,7 +494,16 @@ namespace LabelTool
                 };
 
                 var json = Newtonsoft.Json.JsonConvert.SerializeObject(config, Newtonsoft.Json.Formatting.Indented);
+
+                // 停止监测，避免保存操作触发变更通知
+                var wasWatching = _configFileWatcher != null;
+                if (wasWatching) StopConfigFileWatcher();
+
                 File.WriteAllText(GetConfigPath(), json);
+
+                // 恢复监测
+                if (wasWatching) StartConfigFileWatcher();
+
                 _statusLabel.Text = "配置已保存";
                 _isModify = false;
             }
@@ -502,6 +511,63 @@ namespace LabelTool
             {
                 MessageBox.Show($"保存配置失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        #endregion
+
+        #region 配置文件监测
+
+        private void StartConfigFileWatcher()
+        {
+            // 每次启动前先停止旧的 watcher
+            StopConfigFileWatcher();
+
+            var configPath = GetConfigPath();
+            var dataDir = GetDataDir();
+            var fileName = Path.GetFileName(configPath);
+
+            _configFileWatcher = new FileSystemWatcher(dataDir, fileName)
+            {
+                NotifyFilter = NotifyFilters.LastWrite,
+                EnableRaisingEvents = true
+            };
+
+            _configFileWatcher.Changed += OnConfigFileChanged;
+        }
+
+        private void StopConfigFileWatcher()
+        {
+            if (_configFileWatcher != null)
+            {
+                _configFileWatcher.EnableRaisingEvents = false;
+                _configFileWatcher.Changed -= OnConfigFileChanged;
+                _configFileWatcher.Dispose();
+                _configFileWatcher = null;
+            }
+        }
+
+        // FileSystemWatcher 在后台线程触发，需 Invoke 切回 UI 线程
+        private void OnConfigFileChanged(object _, FileSystemEventArgs __)
+        {
+            // 第一个回调会 Dispose watcher，后续入队的回调看到 watcher == null 就会直接返回
+            if (_configFileWatcher == null) return;
+
+            BeginInvoke(new Action(() =>
+            {
+                if (_configFileWatcher == null) return;
+                StopConfigFileWatcher();
+
+                var result = MessageBox.Show(
+                    "检测到配置文件已变更，是否重新加载？",
+                    "配置文件已修改", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+                if (result == DialogResult.Yes)
+                {
+                    LoadConfig();
+
+                    _statusLabel.Text = "配置已重新加载";
+                }
+            }));
         }
 
         #endregion

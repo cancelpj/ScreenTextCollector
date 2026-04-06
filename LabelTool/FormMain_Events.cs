@@ -51,6 +51,8 @@ namespace LabelTool
                     e.Cancel = true;
                 }
             }
+
+            StopConfigFileWatcher();
         }
 
         private void FormMain_Load(object sender, EventArgs e)

@@ -10,7 +10,7 @@ namespace LabelTool
 {
     public partial class FormMain : Form
     {
-        private const string Title = "截屏采集标注工具 V1.5";
+        private const string Title = "截屏采集标注工具 V1.5.1";
 
         // 截屏图片（按屏幕分组存储）
         private Dictionary<int, Bitmap> _screenScreenshots = new Dictionary<int, Bitmap>();
@@ -122,6 +122,9 @@ namespace LabelTool
         // 每个元素的 (X,Y) 表示 rect.X + rect.Width * X, rect.Y + rect.Height * Y
         private static readonly float[] _handleFX = { 0f, 0.5f, 1f, 1f, 1f, 0.5f, 0f, 0f };
         private static readonly float[] _handleFY = { 0f, 0f, 0f, 0.5f, 1f, 1f, 1f, 0.5f };
+
+        // 配置文件监测器（监测记事本编辑保存）
+        private FileSystemWatcher _configFileWatcher;
 
         public FormMain()
         {
@@ -265,7 +268,7 @@ namespace LabelTool
             _screenComboBox.ComboBox.DropDown += new EventHandler(ScreenComboBox_DropDown);
 
             _btnSave.Name = "_btnSave";
-            _btnSave.Text = "保存采集配置 Ctrl+S";
+            _btnSave.Text = "保存 Ctrl+S";
             _btnSave.Image = saveIcon;
             _btnSave.Click += new System.EventHandler(this.BtnSave_Click);
 
@@ -327,9 +330,9 @@ namespace LabelTool
 
             _toolStrip.Items.Add(_toolStripLabel1);
             _toolStrip.Items.Add(_thresholdComboBox);
+            _toolStrip.Items.Add(_toolStripSepC);
             _toolStrip.Items.Add(_ocrEngineLabel);
             _toolStrip.Items.Add(_ocrEngineComboBox);
-            _toolStrip.Items.Add(_toolStripSepC);
             _toolStrip.Items.Add(_btnOcrTest);
 
             // 缩放控制

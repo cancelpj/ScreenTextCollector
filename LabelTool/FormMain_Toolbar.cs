@@ -69,7 +69,8 @@ namespace LabelTool
                     return; // 用户取消
                 }
 
-                // 清理旧配置
+                // 清理旧配置（停止监测避免删除事件触发通知）
+                StopConfigFileWatcher();
                 DeleteOldConfig();
             }
 
@@ -91,10 +92,19 @@ namespace LabelTool
 
         private void BtnOpenConfig_Click(object sender, EventArgs e)
         {
+            if (_isModify)
+            {
+                var result = MessageBox.Show("当前有未保存的修改，是否先保存？", "未保存的更改",
+                    MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question);
+                if (result == DialogResult.Cancel) return;
+                if (result == DialogResult.Yes) SaveConfig();
+            }
+
             var configPath = GetConfigPath();
             if (File.Exists(configPath))
             {
                 System.Diagnostics.Process.Start("notepad.exe", configPath);
+                StartConfigFileWatcher();
             }
             else
             {
