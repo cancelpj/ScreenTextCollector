@@ -144,6 +144,49 @@ namespace PluginInterface
         #endregion
 
         /// <summary>
+        /// 校验屏幕配置的有效性（越界检查 + 分辨率检查）
+        /// </summary>
+        /// <param name="screenNumber">屏幕编号</param>
+        /// <param name="errorMessage">校验失败时的错误信息</param>
+        /// <returns>校验是否通过（越界/分辨率不匹配均返回 false）</returns>
+        private static bool ValidateScreenConfig(int screenNumber, out string errorMessage)
+        {
+            errorMessage = null;
+
+            // 1. 越界检查
+            if (screenNumber < 0 || screenNumber >= Screen.AllScreens.Length)
+            {
+                errorMessage = $"屏幕 {screenNumber} 超出系统屏幕范围（0-{Screen.AllScreens.Length - 1}）";
+                return false;
+            }
+
+            // 2. 分辨率检查：以 data/screenshot_{n}.png 为基准，与当前屏幕比较
+            var refPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data", $"screenshot_{screenNumber}.png");
+            if (File.Exists(refPath))
+            {
+                try
+                {
+                    using (var refImg = Image.FromFile(refPath))
+                    {
+                        var currentBounds = Screen.AllScreens[screenNumber].Bounds;
+                        if (refImg.Width != currentBounds.Width || refImg.Height != currentBounds.Height)
+                        {
+                            errorMessage = $"屏幕 {screenNumber} 分辨率不匹配"
+                                + $"（配置: {refImg.Width}×{refImg.Height}，当前: {currentBounds.Width}×{currentBounds.Height}）";
+                            return false;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Warn($"屏幕 {screenNumber} 读取截图失败，分辨率检查跳过: {ex.Message}");
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
         /// 截取指定屏幕
         /// </summary>
         /// <param name="screenNumber">屏幕编号，从 0 开始</param>
@@ -304,6 +347,13 @@ namespace PluginInterface
 
                 foreach (var screenNumber in allScreenNumbers)
                 {
+                    // 越界和分辨率校验
+                    if (!ValidateScreenConfig(screenNumber, out string errorMsg))
+                    {
+                        Log.Error(errorMsg + "，跳过");
+                        continue;
+                    }
+
                     // 调用 CaptureAndVerify 进行截屏和图像校验
                     var captureResult = CaptureAndVerify(verifyImage, verificationAreas, screenNumber);
                     if (captureResult.ResultType != MethodResultType.Success)
@@ -360,6 +410,12 @@ namespace PluginInterface
             if (area == null)
             {
                 return new MethodResult($"未找到采集区域: {areaName}", MethodResultType.Error);
+            }
+
+            // 越界和分辨率校验
+            if (!ValidateScreenConfig(area.ScreenNumber, out string errorMsg))
+            {
+                return new MethodResult(errorMsg, MethodResultType.Error);
             }
 
             var captureResult = CaptureAndVerify(verifyImage, CaptureSettings.VerificationAreas, area.ScreenNumber);
