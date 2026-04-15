@@ -242,16 +242,10 @@ namespace LabelTool
                 }
 
                 // 删除所有截图文件
-                var screenshotFiles = Directory.GetFiles(dataDir, "screenshot_*.png");
+                var screenshotFiles = Directory.GetFiles(dataDir, "*.png");
                 foreach (var file in screenshotFiles)
                 {
                     File.Delete(file);
-                }
-
-                // 删除 data 目录中的模板图片
-                if (Directory.Exists(dataDir))
-                {
-                    Directory.Delete(dataDir, true);
                 }
 
                 ClearAllData();
