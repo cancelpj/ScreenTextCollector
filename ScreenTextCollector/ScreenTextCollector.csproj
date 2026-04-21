@@ -13,7 +13,7 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- 解决非字符串资源（如 .ico）编译问题 -->
-    <PackageReference Include="System.Resources.Extensions" Version="10.0.5" />
+    <PackageReference Include="System.Resources.Extensions" Version="10.0.6" />
   </ItemGroup>
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
@@ -30,7 +30,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\PluginInterface\PluginInterface.csproj" />
-    <ProjectReference Include="..\ScreenTextCollector.OpenCVsharp\ScreenTextCollector.OpenCvSharp.csproj" />
     <ProjectReference Include="..\ScreenTextCollector.PaddleOCR\ScreenTextCollector.PaddleOCR.csproj" />
   </ItemGroup>
   <ItemGroup Label="Compile items now included by globbing that were not in the original project file">

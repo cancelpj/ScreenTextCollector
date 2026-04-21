@@ -10,7 +10,7 @@ namespace LabelTool
 {
     public partial class FormMain : Form
     {
-        private const string Title = "截屏采集标注工具 V1.5.3";
+        private const string Title = "截屏采集标注工具 V1.6";
 
         // 截屏图片（按屏幕分组存储）
         private Dictionary<int, Bitmap> _screenScreenshots = new Dictionary<int, Bitmap>();
@@ -40,7 +40,7 @@ namespace LabelTool
         private bool _isVerificationAreaMode = true; // true=检测区域, false=采集区域
 
         // 匹配阈值
-        private float _matchThreshold = 1;
+        private float _matchThreshold = 1;  // 初始值由 _thresholdComboBox.SelectedIndex 设置
 
         // 可用的 MQTT Topic 列表
         private List<string> _availableTopics = new List<string>();
@@ -306,18 +306,18 @@ namespace LabelTool
             _toolStripLabel1.Name = "_toolStripLabel1";
             _toolStripLabel1.Text = "默认匹配度:";
             _thresholdComboBox.AutoSize = false;
-            _thresholdComboBox.Width = 40;
+            _thresholdComboBox.Width = 50;
             _thresholdComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
             _thresholdComboBox.Items.AddRange(new object[] { "1", "0.95", "0.9", "0.85", "0.8" });
             _thresholdComboBox.Name = "_thresholdComboBox";
-            _thresholdComboBox.SelectedIndex = 0;
+            _thresholdComboBox.SelectedIndex = 1;
             _thresholdComboBox.SelectedIndexChanged += new System.EventHandler(this.ThresholdComboBox_SelectedIndexChanged);
 
             // OCR引擎下拉框
             _ocrEngineLabel.Name = "_ocrEngineLabel";
             _ocrEngineLabel.Text = "OCR引擎:";
             _ocrEngineComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
-            _ocrEngineComboBox.Items.AddRange(new object[] { "PaddleOCR", "OpenCvSharp" });
+            _ocrEngineComboBox.Items.AddRange(new object[] { "PaddleOCR" });
             _ocrEngineComboBox.Name = "_ocrEngineComboBox";
             _ocrEngineComboBox.SelectedIndex = 0; // 默认PaddleOCR
             _ocrEngineComboBox.SelectedIndexChanged += new System.EventHandler(this.OcrEngineComboBox_SelectedIndexChanged);

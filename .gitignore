@@ -367,4 +367,5 @@ settings.local.json
 
 /TestImages
 /publish_*
+/ScreenTextCollector_*
 *.nrproj

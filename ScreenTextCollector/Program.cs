@@ -172,7 +172,7 @@ namespace ScreenTextCollector
                 case "paddleocr":
                     return new ScreenTextCollector.PaddleOCR.OcrService();
                 default:
-                    return new ScreenTextCollector.OpenCvSharp.OcrService();
+                    return new ScreenTextCollector.PaddleOCR.OcrService();
             }
         }
 

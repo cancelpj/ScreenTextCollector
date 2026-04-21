@@ -11,12 +11,10 @@ namespace LabelTool
         /// <summary>
         /// 根据选中的索引创建对应的 OCR 服务实例
         /// </summary>
-        /// <param name="engineIndex">0=PaddleOCR, 1=OpenCvSharp</param>
+        /// <param name="engineIndex">_ocrEngineComboBox.Items</param>
         private IOcrService CreateOcrService(int engineIndex)
         {
-            return engineIndex == 0
-                ? (IOcrService)new ScreenTextCollector.PaddleOCR.OcrService()
-                : (IOcrService)new ScreenTextCollector.OpenCvSharp.OcrService();
+            return new ScreenTextCollector.PaddleOCR.OcrService();
         }
 
         /// <summary>
