@@ -4,18 +4,21 @@
 
 ## 编译
 
+版本号在编译时通过 `-ldflags="-X main.version=YYYY.MM.DD.HHmm"` 注入，格式为"年月日时分"（如 `2026.04.23.1430`）。
+
 ### 标准编译（64位）
+Bash 示例：
 ```bash
-go build -o CaptureScreen64.exe
+VER=$(date -d "now" "+%Y.%m.%d.%H%M")  # Linux/macOS
+go build -ldflags="-s -w -X main.version=$VER" -o CaptureScreen64.exe
+```
+PowerShell 示例：
+```powershell
+$VER = Get-Date -Format "yyyy.MM.dd.HHmm"; go build -ldflags="-s -w -X main.version=$VER" -o CaptureScreen64.exe
 ```
 
 ### 静态编译（32位，适用于 Windows XP/2000）
-```bash
-CGO_ENABLED=0 GOOS=windows GOARCH=386 go build -ldflags="-s -w" -o CaptureScreen32.exe
-```
-```powershell
-$env:CGO_ENABLED=0; $env:GOOS="windows"; $env:GOARCH="386"; go build -ldflags="-s -w" -o CaptureScreen32.exe
-```
+直接运行 `build32.cmd`，脚本自动生成版本号并注入。
 
 ## 配置
 
@@ -51,7 +54,7 @@ CaptureScreen.exe custom-config.json
 ```json
 {
   "status": "ok",
-  "version": "1.0.0"
+  "version": "2026.04.23.1430"
 }
 ```
 
@@ -127,7 +130,7 @@ go test -v -run TestScreenshot_SingleArea
 
 | 用例 | 说明 |
 |------|------|
-| `TestHealth_GET` | GET /health 返回 `{"status":"ok","version":"1.0.0"}` |
+| `TestHealth_GET` | GET /health 返回 `{"status":"ok","version":"YYYY.MM.DD.HHmm"}` |
 | `TestHealth_POST_MethodNotAllowed` | POST /health 返回 405 |
 | `TestScreenshot_SingleArea` | 单屏幕单区域截图，返回有效 Base64 JPEG |
 | `TestScreenshot_MultiArea` | 单屏幕多区域截图，各区域均返回截图 |
