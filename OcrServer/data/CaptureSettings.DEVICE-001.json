@@ -1,0 +1,52 @@
+{
+  "verificationAreas": [
+    {
+      "screenNumber": 0,
+      "topLeftX": 656,
+      "topLeftY": 86,
+      "width": 590,
+      "height": 80,
+      "fileName": "0_检测区域1.png",
+      "matchThreshold": 0.95
+    }
+  ],
+  "collectionAreas": [
+    {
+      "screenNumber": 0,
+      "name": "温度",
+      "topLeftX": 434,
+      "topLeftY": 433,
+      "width": 91,
+      "height": 52,
+      "topic": "screen/alarm/110001"
+    },
+    {
+      "screenNumber": 0,
+      "name": "湿度",
+      "topLeftX": 851,
+      "topLeftY": 434,
+      "width": 61,
+      "height": 51,
+      "topic": "screen/collection/110001"
+    },
+    {
+      "screenNumber": 0,
+      "name": "噪声",
+      "topLeftX": 1260,
+      "topLeftY": 402,
+      "width": 81,
+      "height": 51,
+      "topic": "screen/collection/110001"
+    },
+    {
+      "screenNumber": 0,
+      "name": "气压",
+      "topLeftX": 424,
+      "topLeftY": 754,
+      "width": 93,
+      "height": 49,
+      "topic": "screen/alarm/110001"
+    }
+  ],
+  "ocrEngine": "PaddleOCR"
+}

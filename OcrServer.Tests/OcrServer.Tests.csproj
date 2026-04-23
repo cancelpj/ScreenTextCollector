@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <TargetFramework>net10.0</TargetFramework>
+    <!-- C# 13 支持 nameof typeof 等特性 -->
+    <LangVersion>13.0</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- xunit.v3 测试框架 -->
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.4.0" />
+    <PackageReference Include="xunit.v3" Version="3.2.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <!-- Moq 用于 Mock -->
+    <PackageReference Include="Moq" Version="4.20.72" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OcrServer\OcrServer.csproj" />
+  </ItemGroup>
+
+  <!-- 复制测试图片到输出目录 -->
+  <ItemGroup>
+    <None Include="..\TestImages\纵拉机\test_screenshot_1.png">
+      <Link>TestData\纵拉机\test_screenshot_1.png</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\TestImages\纵拉机\test_screenshot_2.png">
+      <Link>TestData\纵拉机\test_screenshot_2.png</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\TestImages\纵拉机\data\20260117115113709.png">
+      <Link>TestData\纵拉机\20260117115113709.png</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\TestImages\拉弯机\data\screenshot.png">
+      <Link>TestData\拉弯机\screenshot.png</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="..\TestImages\拉弯机\data\20260113064214930.png">
+      <Link>TestData\拉弯机\20260113064214930.png</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>

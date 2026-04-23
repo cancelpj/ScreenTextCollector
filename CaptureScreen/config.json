@@ -1,0 +1,8 @@
+{
+  "server": {
+    "ip": "0.0.0.0",
+    "port": 2333
+  },
+  "jpeg_quality": 85,
+  "log_level": "info"
+}
