@@ -3,8 +3,8 @@
 ## 目标
 
 将现有的单机版 ScreenTextCollector 改造为 C/S 架构：
-- **服务端 CaptureScreen**：部署在 Windows XP/2000 32位老旧系统，仅负责截取完整屏幕截图（被动响应）
-- **客户端 OcrServer**：跨平台运行，主动调用 CaptureScreen 获取完整屏幕截图，执行图像验证和 OCR，以 MQTT/HTTP 方式对外提供结果
+- **客户端 CaptureScreen**：部署在 Windows XP/2000 32位老旧系统，仅负责截取完整屏幕截图（被动响应）
+- **服务端 OcrServer**：跨平台运行，主动调用 CaptureScreen 获取完整屏幕截图，执行图像验证和 OCR，以 MQTT/HTTP 方式对外提供结果
 
 **关键设计**：CaptureScreen 只接收屏幕编号，返回该屏幕的**完整截图**（每屏幕一张 Base64 JPEG）；OcrServer 收到完整截图后，在本地完成图像验证、按区域裁剪、OCR 识别、MQTT 推送的全流程。
 
@@ -82,7 +82,7 @@ OcrServer 维护一个设备列表，每个设备有独立的 `DeviceCode`、IP 
 
 ---
 
-## 三、服务端 CaptureScreen（Go）
+## 三、客户端 CaptureScreen（Go）
 
 ### 职责
 
@@ -169,7 +169,7 @@ $env:CGO_ENABLED=0; $env:GOOS="windows"; $env:GOARCH="386"; go build -ldflags="-
 
 ---
 
-## 四、客户端 OcrServer（ASP.NET Core 10 Native AOT）
+## 四、服务端 OcrServer（ASP.NET Core 10 Native AOT）
 
 ### 项目结构
 
