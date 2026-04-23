@@ -1,14 +1,8 @@
 using OcrServer.Configuration;
 using OcrServer.Serialization;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Text;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
 using ILogger = Serilog.ILogger;
 
 namespace OcrServer.Services;
@@ -28,8 +22,8 @@ public sealed class CollectService : IHostedService, IDisposable
     // 每台设备一个独立的 HttpClient（CaptureScreenClient）
     private readonly ConcurrentDictionary<string, CaptureScreenClient> _clients = new();
     private readonly OcrService _ocrService;
-    private CancellationTokenSource _cts;
-    private Task _mainLoop;
+    private CancellationTokenSource? _cts;
+    private Task? _mainLoop;
 
     // 设备代码 -> CaptureSettings 映射（从各设备的 JSON 文件加载）
     private readonly ConcurrentDictionary<string, CaptureSettings> _deviceSettings = new();
