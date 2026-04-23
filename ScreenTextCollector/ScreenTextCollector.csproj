@@ -13,7 +13,7 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- 解决非字符串资源（如 .ico）编译问题 -->
-    <PackageReference Include="System.Resources.Extensions" Version="10.0.6" />
+    <PackageReference Include="System.Resources.Extensions" Version="10.0.7" />
   </ItemGroup>
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
