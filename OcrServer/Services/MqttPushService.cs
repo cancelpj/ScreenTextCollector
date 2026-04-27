@@ -164,12 +164,9 @@ public sealed class MqttPushService : IHostedService, IDisposable
 
         try
         {
-            // 手动构建 JSON 以确保 Native AOT 兼容
-            string dataJson = System.Text.Json.JsonSerializer.Serialize(
-                new Dictionary<string, string>(payload.Data), JsonContext.Default.DictionaryStringString);
-            string extendJson = System.Text.Json.JsonSerializer.Serialize(
-                new Dictionary<string, string>(payload.ExtendPayload), JsonContext.Default.DictionaryStringString);
-            string json = $"{{\"timestamp\":{payload.Timestamp},\"Data\":{dataJson},\"ExtendPayload\":{extendJson}}}";
+            // 根层级所有字段平铺：TIMESTAMP、采集结果、扩展字段全部在同一层
+            var dict = payload.Root;
+            string json = System.Text.Json.JsonSerializer.Serialize(dict, JsonContext.Default.DictionaryStringString);
 
             var message = new MqttApplicationMessageBuilder()
                 .WithTopic(topic)

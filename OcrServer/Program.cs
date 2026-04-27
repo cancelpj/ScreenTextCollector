@@ -32,13 +32,13 @@ public class Program
 
         // 配置 Serilog：控制台 Info+，文件 Debug+
         Log.Logger = new LoggerConfiguration()
-            .MinimumLevel.Debug()
-            .WriteTo.Console(restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Information)
+            .MinimumLevel.Information()
+            .WriteTo.Console(restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Debug)
             .WriteTo.File(
                 path: Path.Combine(dataDir, "..", "logs", "ocrserver-.log"),
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 7,
-                restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Debug)
+                restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Warning)
             .CreateLogger();
 
         try

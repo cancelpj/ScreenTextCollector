@@ -1,7 +1,12 @@
 using OcrServer.Configuration;
 using OcrServer.Serialization;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
 using System.Text;
 using System.Text.Json;
+using ILogger = Serilog.ILogger;
 
 namespace OcrServer.Services;
 
@@ -11,16 +16,18 @@ namespace OcrServer.Services;
 public sealed class CaptureScreenClient : IDisposable
 {
     private HttpClient _httpClient;
+    private readonly DeviceConfig _deviceConfig;
+    private readonly ILogger _logger;
 
     /// <summary>
     /// 测试用：注入 Mock HttpClient
     /// </summary>
     internal void SetHttpClient(HttpClient httpClient) => _httpClient = httpClient;
-    private readonly DeviceConfig _deviceConfig;
 
-    public CaptureScreenClient(DeviceConfig deviceConfig)
+    public CaptureScreenClient(DeviceConfig deviceConfig, ILogger logger)
     {
         _deviceConfig = deviceConfig;
+        _logger = logger;
         _httpClient = new HttpClient
         {
             BaseAddress = new Uri(deviceConfig.CaptureScreenUrl.TrimEnd('/')),
@@ -31,9 +38,6 @@ public sealed class CaptureScreenClient : IDisposable
     /// <summary>
     /// 请求完整屏幕截图（每屏幕返回一张图）
     /// </summary>
-    /// <param name="screenIndices">屏幕编号列表</param>
-    /// <param name="cancellationToken">取消令牌</param>
-    /// <returns>screenIndex -> Base64 完整屏幕截图</returns>
     public async Task<Dictionary<int, string>> CaptureFullScreenAsync(
         List<int> screenIndices,
         CancellationToken cancellationToken = default)
@@ -41,32 +45,65 @@ public sealed class CaptureScreenClient : IDisposable
         var screens = screenIndices.Select(i => new CaptureScreenRequest.ScreenInfo { ScreenIndex = i }).ToList();
         var requestBody = new CaptureScreenRequest { Screens = screens };
         string json = JsonSerializer.Serialize(requestBody, JsonContext.Default.CaptureScreenRequest);
+        string fullUrl = $"{_deviceConfig.CaptureScreenUrl.TrimEnd('/')}/api/screenshot";
 
-        string fullUrl = _deviceConfig.CaptureScreenUrl.TrimEnd('/') + "/api/screenshot";
-        HttpResponseMessage response = await _httpClient.PostAsync(
+        try
+        {
+            HttpResponseMessage response = await _httpClient.PostAsync(
                 new Uri(fullUrl),
                 new StringContent(json, Encoding.UTF8, "application/json"),
                 cancellationToken);
 
-        if (!response.IsSuccessStatusCode)
-        {
-            string errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
-            throw new HttpRequestException(
-                $"CaptureScreen [{_deviceConfig.DeviceCode}] HTTP {(int)response.StatusCode}: {errorBody}");
+            if (!response.IsSuccessStatusCode)
+            {
+                string errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                _logger.Warning("设备 {DeviceCode} HTTP 请求失败 [{StatusCode}]，Body: {Body}",
+                    _deviceConfig.DeviceCode, (int)response.StatusCode, errorBody);
+                throw new HttpRequestException($"设备 [{_deviceConfig.DeviceCode}] HTTP {(int)response.StatusCode}");
+            }
+
+            string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+            var result = JsonSerializer.Deserialize(responseBody, JsonContext.Default.CaptureScreenResponse)
+                ?? throw new InvalidDataException($"设备 [{_deviceConfig.DeviceCode}] 响应解析失败，返回数据为空");
+
+            var screenshots = new Dictionary<int, string>();
+            foreach (var screen in result.Screens)
+                screenshots[screen.ScreenIndex] = screen.Image;
+            return screenshots;
         }
-
-        string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-        var result = JsonSerializer.Deserialize(responseBody, JsonContext.Default.CaptureScreenResponse)
-            ?? throw new InvalidDataException("CaptureScreen response deserialized to null");
-
-        // 解析为 screenIndex -> Base64
-        var screenshots = new Dictionary<int, string>();
-        foreach (var screen in result.Screens)
+        catch (HttpRequestException ex) when (
+            ex.InnerException is TimeoutException ||
+            ex.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase))
         {
-            screenshots[screen.ScreenIndex] = screen.Image;
+            _logger.Warning("设备 {DeviceCode} 请求超时（>{Timeout}秒），CaptureScreen 可能离线或响应过慢",
+                _deviceConfig.DeviceCode, _deviceConfig.TimeoutSeconds);
+            throw;
         }
-
-        return screenshots;
+        catch (HttpRequestException ex) when (
+            ex.InnerException is WebException { Status: WebExceptionStatus.ConnectFailure } ||
+            ex.Message.Contains("refused", StringComparison.OrdinalIgnoreCase) ||
+            ex.Message.Contains("denied", StringComparison.OrdinalIgnoreCase) ||
+            ex.Message.Contains("No connection could be made", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.Warning("设备 {DeviceCode} 连接被拒绝（{Url}），CaptureScreen 服务未启动或网络不通",
+                _deviceConfig.DeviceCode, fullUrl);
+            throw;
+        }
+        catch (HttpRequestException ex) when (
+            ex.InnerException is IOException ||
+            ex.Message.Contains("aborted", StringComparison.OrdinalIgnoreCase) ||
+            ex.Message.Contains("canceled", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.Debug("设备 {DeviceCode} 请求被取消或网络中断：{Message}",
+                _deviceConfig.DeviceCode, ex.Message);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "设备 {DeviceCode} 请求异常：{Message}",
+                _deviceConfig.DeviceCode, ex.Message);
+            throw;
+        }
     }
 
     public void Dispose() => _httpClient.Dispose();

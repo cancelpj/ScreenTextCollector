@@ -10,7 +10,9 @@
     <AssemblyName>OcrServer</AssemblyName>
     <InvariantGlobalization>false</InvariantGlobalization>
     <InvariantTimezone>false</InvariantTimezone>
-  </PropertyGroup>
+		<!--<Version>$( [System.DateTime]::Now.ToString("yyyy.MM.dd.HHmm") )</Version>-->
+		<FileVersion>$( [System.DateTime]::Now.ToString("yyyy.MM.dd.HHmm") )</FileVersion>
+	</PropertyGroup>
 
   <!-- 允许测试项目访问 internal 成员（SetHttpClient） -->
   <ItemGroup>

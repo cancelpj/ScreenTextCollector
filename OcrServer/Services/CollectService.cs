@@ -49,7 +49,7 @@ public sealed class CollectService : IHostedService, IDisposable
         // 为每个设备创建 CaptureScreenClient 并加载对应的 CaptureSettings
         foreach (var device in appSettings.Devices)
         {
-            _clients[device.DeviceCode] = new CaptureScreenClient(device);
+            _clients[device.DeviceCode] = new CaptureScreenClient(device, logger);
             LoadDeviceSettings(device.DeviceCode);
         }
     }
@@ -286,21 +286,19 @@ public sealed class CollectService : IHostedService, IDisposable
         {
             string topicName = group.Key;
 
-            var payload = new MqttPayload
-            {
-                Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-            };
+            var payload = new MqttPayload();
+            payload.Root["TIMESTAMP"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString();
 
             foreach (var area in group)
             {
-                payload.Data[area.Name] = ocrResults[area.Name];
+                payload.Root[area.Name] = ocrResults[area.Name];
             }
 
             if (device.DefaultExtendPayload != null)
             {
                 foreach (var kvp in device.DefaultExtendPayload)
                 {
-                    payload.ExtendPayload[kvp.Key] = kvp.Value;
+                    payload.Root[kvp.Key] = kvp.Value;
                 }
             }
 
@@ -309,7 +307,7 @@ public sealed class CollectService : IHostedService, IDisposable
             {
                 foreach (var kvp in topicConfig.ExtendPayload)
                 {
-                    payload.ExtendPayload[kvp.Key] = kvp.Value;
+                    payload.Root[kvp.Key] = kvp.Value;
                 }
             }
 

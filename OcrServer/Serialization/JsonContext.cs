@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using OcrServer.Configuration;
@@ -42,24 +41,14 @@ public sealed class ScreenResult
 #endregion
 
 /// <summary>
-/// MQTT 推送 Payload 结构（与 ScreenTextCollector 100% 兼容）
+/// MQTT 推送 Payload 结构（Data 和 ExtendPayload 合并到根层级，TIMESTAMP 全大写）
 /// </summary>
 public sealed class MqttPayload
 {
     /// <summary>
-    /// 时间戳（毫秒）
+    /// 根层级字段：TIMESTAMP、采集结果、扩展字段全部扁平化
     /// </summary>
-    public long Timestamp { get; set; }
-
-    /// <summary>
-    /// 采集结果数据（AreaName -> OCR 结果）
-    /// </summary>
-    public Dictionary<string, string> Data { get; set; } = new(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>
-    /// 扩展 Payload（DeviceCode、GroupCode 等）
-    /// </summary>
-    public Dictionary<string, string> ExtendPayload { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, string> Root { get; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
 /// <summary>
