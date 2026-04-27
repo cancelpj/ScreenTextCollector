@@ -12,8 +12,7 @@ public class Program
     {
         // 从 data/appsettings.json 加载配置
         var dataDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "data");
-        if (!Directory.Exists(dataDir))
-            Directory.CreateDirectory(dataDir);
+        Directory.CreateDirectory(dataDir);
 
         var appSettingsPath = Path.Combine(dataDir, "appsettings.json");
         AppSettings appSettings;
@@ -30,16 +29,8 @@ public class Program
             return 1;
         }
 
-        // 配置 Serilog：控制台 Info+，文件 Debug+
-        Log.Logger = new LoggerConfiguration()
-            .MinimumLevel.Information()
-            .WriteTo.Console(restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Debug)
-            .WriteTo.File(
-                path: Path.Combine(dataDir, "..", "logs", "ocrserver-.log"),
-                rollingInterval: RollingInterval.Day,
-                retainedFileCountLimit: 7,
-                restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Warning)
-            .CreateLogger();
+        var loggerConfig = appSettings.Serilog.CreateLogger(dataDir);
+        Log.Logger = loggerConfig.CreateLogger();
 
         try
         {

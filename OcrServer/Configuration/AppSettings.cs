@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace OcrServer.Configuration;
 
 /// <summary>
@@ -12,6 +10,11 @@ public class AppSettings
     /// 本地 csv 文件记录
     /// </summary>
     public bool CsvRecord { get; set; }
+
+    /// <summary>
+    /// Serilog 日志配置
+    /// </summary>
+    public SerilogConfig Serilog { get; set; } = new();
 
     /// <summary>
     /// HTTP 服务配置
