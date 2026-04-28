@@ -27,12 +27,12 @@ public sealed class MqttPushService : IHostedService, IDisposable
         _mqttClient = new MqttClientFactory().CreateMqttClient();
     }
 
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public Task StartAsync(CancellationToken cancellationToken)
     {
         if (!_config.EnableMqttPush)
         {
             _logger.Information("MQTT 推送已禁用");
-            return;
+            return Task.CompletedTask;
         }
 
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -40,8 +40,9 @@ public sealed class MqttPushService : IHostedService, IDisposable
         // 订阅断开事件，自动重连
         _mqttClient.DisconnectedAsync += OnDisconnectedAsync;
 
-        // 首次连接（带重连）
-        await ConnectWithRetryAsync(_cts.Token);
+        // 将 MQTT 连接作为后台任务执行，不阻塞 StartAsync，让采集服务尽快启动
+        _ = Task.Run(() => ConnectWithRetryAsync(_cts.Token), _cts.Token);
+        return Task.CompletedTask;
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
