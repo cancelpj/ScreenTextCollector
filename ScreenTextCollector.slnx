@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="LabelTool/LabelTool.csproj" />
+  <Project Path="OcrServer.Tests/OcrServer.Tests.csproj" />
+  <Project Path="OcrServer/OcrServer.csproj" />
+  <Project Path="PluginInterface/PluginInterface.csproj" />
+  <Project Path="ScreenTextCollector.PaddleOCR/ScreenTextCollector.PaddleOCR.csproj" />
+  <Project Path="ScreenTextCollector.Tests/ScreenTextCollector.Tests.csproj" />
+  <Project Path="ScreenTextCollector/ScreenTextCollector.csproj" />
+</Solution>

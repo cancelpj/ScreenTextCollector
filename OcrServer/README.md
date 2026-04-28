@@ -9,17 +9,18 @@ OcrServer 是 ScreenTextCollector C/S 架构中的客户端组件，负责从 Ca
 | 框架 | ASP.NET Core 10 Native AOT | 跨平台，启动快，内存占用低 |
 | MQTT | MQTTnet 5.1 | AOT 兼容，替换原手写 SimpleMqttClient |
 | JSON | System.Text.Json + Source Generator | AOT 兼容，替换原 Newtonsoft.Json |
-| 日志 | Serilog.Sinks.File + Serilog.Sinks.Console | 控制台 Info+，文件 Debug+ |
-| OCR | PaddleOCRSharp 6.1.0 | 支持 CPU 推理 |
+| 日志 | Serilog.Sinks.File + Serilog.Sinks.Console | AOT 兼容 |
+| OCR | PaddleOCRSharp 6.1.0 | 支持 CPU 推理，AOT 不兼容 |
 
 ## 项目结构
 
 ```
 OcrServer/
 ├── OcrServer.csproj              # .NET 10
-├── Program.cs                    # 启动入口，DI 注册，Serilog 配置
+├── Program.cs                    # 启动入口，DI 注册
 ├── Configuration/
 │   ├── AppSettings.cs            # appsettings.json 结构体
+│   ├── SerilogConfig.cs          # Serilog 配置（代替 Serilog.Settings.Configuration ，因为它不兼容 AOT）
 │   ├── DeviceConfig.cs           # 单台设备配置
 │   └── CaptureSettings.cs        # CaptureSettings.{DeviceCode}.json 结构体
 ├── Services/
@@ -46,15 +47,15 @@ dotnet build OcrServer.csproj -c Debug
 # Release 编译（Framework-Dependent）
 dotnet build OcrServer.csproj -c Release
 
-# Native AOT 发布
+# 发布
 $env:PATH = 'C:\Program Files (x86)\Microsoft Visual Studio\Installer;' + $env:PATH
-dotnet publish OcrServer.csproj -c Release -r win-x64 --self-contained true -o ./publish
+dotnet publish OcrServer.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishReadyToRun=true -o ./bin/OcrServer-x64
 
 # 或使用发布配置文件
-dotnet publish -p:PublishProfile=.\Properties\PublishProfiles\FolderProfile.pubxml -o ./publish
+dotnet publish -p:PublishProfile=.\Properties\PublishProfiles\win-x64.pubxml
 ```
 
-**AOT 发布说明**：
+**AOT 发布说明**：（因 PaddleOCRSharp 6.1.0 暂不支持 AOT 发布）
 
 | 配置项 | 值 |
 |--------|-----|

@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- MQTT 客户端（AOT 兼容） -->
+    <!-- MQTT 客户端 -->
     <PackageReference Include="MQTTnet" Version="5.1.0.1559" />
     <!-- Serilog 日志 -->
     <PackageReference Include="Serilog" Version="4.3.1" />
@@ -38,6 +38,8 @@
   <ItemGroup>
     <Content Include="$(PaddleRuntimePath)\*.*" Condition="Exists('$(PaddleRuntimePath)')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>paddle.runtime.win_x64\%(Filename)%(Extension)</Link>
+      <TargetPath>.\%(Filename)%(Extension)</TargetPath>
       <Visible>false</Visible>
     </Content>
   </ItemGroup>
