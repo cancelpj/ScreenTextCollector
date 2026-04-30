@@ -1,5 +1,6 @@
 using OcrServer.Configuration;
 using OcrServer.Serialization;
+using OcrServer.Utilities;
 using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
@@ -192,11 +193,11 @@ public sealed class CollectService : IHostedService, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.Error(ex, "设备 {DeviceCode} 获取屏幕截图失败", deviceCode);
+            _logger.Warning(NetworkExceptionHelper.GetFriendlyMessage(ex, $"设备 {deviceCode}"));
             return;
         }
 
-        // 步骤 2：图像验证（使用第一个屏幕的截图）
+        // 步骤 2：图像验证
         if (captureSettings.VerificationAreas != null && captureSettings.VerificationAreas.Count > 0)
         {
             // 图像验证只使用第一个屏幕（通常所有验证区域都在 Screen 0）

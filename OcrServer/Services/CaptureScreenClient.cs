@@ -1,9 +1,6 @@
 using OcrServer.Configuration;
 using OcrServer.Serialization;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
+using OcrServer.Utilities;
 using System.Text;
 using System.Text.Json;
 using ILogger = Serilog.ILogger;
@@ -71,37 +68,9 @@ public sealed class CaptureScreenClient : IDisposable
                 screenshots[screen.ScreenIndex] = screen.Image;
             return screenshots;
         }
-        catch (HttpRequestException ex) when (
-            ex.InnerException is TimeoutException ||
-            ex.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase))
-        {
-            _logger.Warning("设备 {DeviceCode} 请求超时（>{Timeout}秒），CaptureScreen 可能离线或响应过慢",
-                _deviceConfig.DeviceCode, _deviceConfig.TimeoutSeconds);
-            throw;
-        }
-        catch (HttpRequestException ex) when (
-            ex.InnerException is WebException { Status: WebExceptionStatus.ConnectFailure } ||
-            ex.Message.Contains("refused", StringComparison.OrdinalIgnoreCase) ||
-            ex.Message.Contains("denied", StringComparison.OrdinalIgnoreCase) ||
-            ex.Message.Contains("No connection could be made", StringComparison.OrdinalIgnoreCase))
-        {
-            _logger.Warning("设备 {DeviceCode} 连接被拒绝（{Url}），CaptureScreen 服务未启动或网络不通",
-                _deviceConfig.DeviceCode, fullUrl);
-            throw;
-        }
-        catch (HttpRequestException ex) when (
-            ex.InnerException is IOException ||
-            ex.Message.Contains("aborted", StringComparison.OrdinalIgnoreCase) ||
-            ex.Message.Contains("canceled", StringComparison.OrdinalIgnoreCase))
-        {
-            _logger.Debug("设备 {DeviceCode} 请求被取消或网络中断：{Message}",
-                _deviceConfig.DeviceCode, ex.Message);
-            throw;
-        }
         catch (Exception ex)
         {
-            _logger.Error(ex, "设备 {DeviceCode} 请求异常：{Message}",
-                _deviceConfig.DeviceCode, ex.Message);
+            _logger.Warning(NetworkExceptionHelper.GetFriendlyMessage(ex, $"设备 {_deviceConfig.DeviceCode}"));
             throw;
         }
     }
