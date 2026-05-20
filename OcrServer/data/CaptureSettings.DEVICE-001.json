@@ -13,7 +13,7 @@
   "collectionAreas": [
     {
       "screenNumber": 0,
-      "name": "温度",
+      "name": "Temperature",
       "topLeftX": 434,
       "topLeftY": 433,
       "width": 91,
@@ -22,7 +22,7 @@
     },
     {
       "screenNumber": 0,
-      "name": "湿度",
+      "name": "Humidity",
       "topLeftX": 851,
       "topLeftY": 434,
       "width": 61,
@@ -31,7 +31,7 @@
     },
     {
       "screenNumber": 0,
-      "name": "噪声",
+      "name": "Noise",
       "topLeftX": 1260,
       "topLeftY": 402,
       "width": 81,
@@ -40,7 +40,7 @@
     },
     {
       "screenNumber": 0,
-      "name": "气压",
+      "name": "Air pressure",
       "topLeftX": 424,
       "topLeftY": 754,
       "width": 93,
